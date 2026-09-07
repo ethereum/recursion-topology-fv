@@ -4,7 +4,7 @@ This note gives a human-readable overview of the memory-reconstruction
 formalization. It is intended to guide review of the definitions and theorem
 statements; the line-by-line paper correspondence remains in
 [`CORRESPONDENCE.md`](CORRESPONDENCE.md), and the ordinary mathematical
-statements remain in [`../VanillaZkVM/math-companion.md`](../VanillaZkVM/math-companion.md).
+statements remain in [`math-companion.md`](math-companion.md).
 
 ## `Preliminaries/VectorCommitment.lean`
 

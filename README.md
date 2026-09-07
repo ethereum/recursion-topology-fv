@@ -59,9 +59,12 @@ The concrete VM variants currently implemented are:
 - **MultiStep without a bus**
   ([`MultiStep.lean`](VanillaZkVM/VMs/MultiStep/MultiStep.lean)): the recursive
   convert/combine/embed proof structure over an abstract segment proof.
+- **Assembled Vanilla VM**
+  ([`VanillaVM.lean`](VanillaZkVM/VMs/VanillaVM/VanillaVM.lean)): the recursive
+  proof structure in which every base segment is checked through the segment
+  bus.
 
-Concrete opcode semantics and the final assembly connecting the recursive
-tower to the segment bus are still to come.
+Concrete opcode semantics are still to come.
 
 Each `*Sanity.lean` file holds concrete models and countermodels witnessing that the definitions
 beside it are satisfiable and the theorems consuming them non-vacuous — kept separate so the
@@ -70,7 +73,7 @@ definition files stay definitions-only.
 The representative five-class ISA is documented in
 [`docs/ISA.md`](docs/ISA.md).
 The segment-bus construction is described mathematically in
-[`VanillaZkVM/math-companion.md`](VanillaZkVM/math-companion.md).
+[`docs/math-companion.md`](docs/math-companion.md).
 
 ## Idealization
 

@@ -52,7 +52,8 @@ private def system : TwoStep.System where
   finalVerify := finalVerify
 
 private theorem assumptions : system.Assumptions := by
-  constructor
+  refine ⟨?_, ?_, exactVC_complete, exactVC_positionBinding,
+    exactVC_updateBinding⟩
   · refine ⟨⟨fun _ proof => proof⟩, ?_⟩
     intro statement proof hverify
     simpa [TwoStep.System.ASSeg, TwoStep.System.RSeg, system, segVerify] using hverify
@@ -97,8 +98,7 @@ example : system.toZkVM.step fullState fullState := by
     ISA.System.operation, isa, memFree, fullState]
 
 example : system.toZkVM.CTE := by
-  exact system.cte (by simp [system]) assumptions exactVC_complete
-    exactVC_positionBinding exactVC_updateBinding
+  exact system.cte (by simp [system]) assumptions
 
 end TwoStepSanity
 end VanillaZkVM

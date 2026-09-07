@@ -70,7 +70,7 @@ The quantitative track is deliberately **off** the critical path. `cte_main` is 
 perfect model, so probabilities must not gate it; Issue 6 strengthens the finished theorem instead of
 standing between the layers and it.
 
-**Every issue produces or extends a math companion** (`VanillaZkVM/math-companion.md`, following the
+**Every issue produces or extends a math companion** (`docs/math-companion.md`, following the
 precedent Dmitry set on `memory-integration`): the pen-and-paper statements matching the Lean, kept
 in lockstep. This is a hard deliverable, not optional.
 
@@ -107,7 +107,7 @@ in lockstep. This is a hard deliverable, not optional.
   contract in `VMs/Step.lean` / `docs/STEP_INTERFACES.md`: `ZkVM.step` is the plain predicate,
   `stepCommitted` is the memory-layer predicate, and `stepWithBus` feeds it through the bus bridge;
   concrete bodies belong to Issues 1, 3, and 5.
-- **Math companion.** Establish `VanillaZkVM/math-companion.md` with the kernel definitions written
+- **Math companion.** Establish `docs/math-companion.md` with the kernel definitions written
   out on paper; every later issue appends to it.
 - **Review requirement.** Ordinary collaborator PR review; there is no additional joint
   Benedikt/George ratification gate for Issue 0. Dmitry signed the paper-facing core rows on

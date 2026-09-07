@@ -27,9 +27,10 @@ memory.
 * `TwoStepSystem.cte` — memory reconstruction turns the concatenated committed
   trace into a valid full-memory execution.
 
-This file provides the bus-backed `ZkVM` instance required by Issue 5 without
-making the reusable segment layer depend on `TwoStep`. Issue 7 can instead use
-the same `Bus.System` as the first proof system of the recursive VM.
+This file provides the Issue 5 `ZkVM`, whose segment proofs use the reusable
+bus checks, without making those checks depend on `TwoStep`. The assembled
+recursive VM in `VMs/VanillaVM/VanillaVM.lean` instead uses the same
+`Bus.System` for its base segment proofs.
 
 Paper: `lem:segment`, Steps 4--6 of `thm:main`, and `def:cte` (ch05),
 specialized here to a non-recursive two-layer way of combining proofs.
@@ -76,9 +77,9 @@ def toTwoStep : TwoStep.System where
   finalVerify := sys.finalVerify
 
 /-- The assumptions used by the non-recursive execution theorem: all
-one-segment bus assumptions plus knowledge soundness of the final proof that
-joins the segment proofs. Memory-commitment assumptions remain separate
-arguments to `cte`.
+one-segment bus assumptions, knowledge soundness of the final proof that joins
+the segment proofs, and the memory-commitment properties needed to reconstruct
+the complete memory.
 
 `sys.toTwoStep.Assumptions` is enough to extract an ordinary TwoStep trace, but
 not enough for `execution_extract`: its segment extractor returns only states
@@ -88,8 +89,18 @@ which requires `sys.segment.Assumptions`.
 Paper: `lem:segment` and the final-proof extraction in Steps 1--5 of
 `thm:main`, restricted to the two-layer arrangement. -/
 structure Assumptions (sys : TwoStepSystem) : Prop where
+  /-- The assumptions needed to extract each accepted segment proof and check
+  its bus. -/
   segment : sys.segment.Assumptions
+  /-- An accepted final proof reveals the segment boundary states and proofs. -/
   finalSound : KnowledgeSound sys.toTwoStep.ASFinal
+  /-- Openings produced from an honestly committed memory are accepted. -/
+  complete : sys.segment.VC.Complete
+  /-- One memory commitment cannot open to two values at the same address. -/
+  positionBinding : sys.segment.VC.PositionBinding
+  /-- A commitment accepted after a write represents the correctly updated
+  memory. -/
+  updateBinding : sys.segment.VC.UpdateBinding
 
 /-- State the reusable bus result in the form required by this concrete VM.
 `stepWithBus_committedOperation` retains a particular memory witness; this
@@ -161,6 +172,8 @@ accepted segment proof, and join the resulting state traces with
 The returned value retains every segment's own bus and `MemStep` values. State
 concatenation occurs only after `busBridge` has proved that each bus-checked
 transition satisfies the existing committed ISA relation.
+This theorem uses the segment and final-proof fields of `Assumptions`; the
+memory fields in the same structure are used later by `cte`.
 
 Paper: `lem:segment` applied per segment and Steps 4--5 of `thm:main` (ch05). -/
 theorem execution_extract (hNseg : 0 < sys.segment.Nseg) (h : sys.Assumptions) :
@@ -224,15 +237,12 @@ evidence for each segment. The existing memory theorem then reconstructs a
 full-memory trace satisfying `ISA.System.stepPlain`.
 
 This is not the complete recursive VanillaVM theorem. Its purpose is to show
-that the reusable segment result can be wired into an actual `ZkVM`; Issue 7
-will connect it to the recursive proof system.
+that the reusable segment result can be used in an actual `ZkVM`; the assembled
+module connects that result to the recursive proof system.
 
 Paper: `lem:segment`, Steps 4--6 of `thm:main`, and `def:cte` (ch05), specialized
 to the two-layer arrangement. -/
-theorem cte (hNseg : 0 < sys.segment.Nseg) (h : sys.Assumptions)
-    (hComplete : sys.segment.VC.Complete)
-    (hpos : sys.segment.VC.PositionBinding)
-    (hupd : sys.segment.VC.UpdateBinding) :
+theorem cte (hNseg : 0 < sys.segment.Nseg) (h : sys.Assumptions) :
     sys.toZkVM.CTE := by
   obtain ⟨E, hE⟩ := sys.execution_extract hNseg h
   refine ⟨fun x p =>
@@ -249,7 +259,8 @@ theorem cte (hNseg : 0 < sys.segment.Nseg) (h : sys.Assumptions)
     simpa [toZkVM, toTwoStep, TwoStep.System.toZkVM, committedStatement] using hp
   have hexecution : execution.Valid sys committedStatement := hE _ _ hverify
   simpa [toZkVM, toTwoStep, execution] using
-    sys.toTwoStep.traceValid_full hComplete hpos hupd x (execution.trace sys)
+    sys.toTwoStep.traceValid_full h.complete h.positionBinding h.updateBinding x
+      (execution.trace sys)
       hexecution.2
 
 end TwoStepSystem

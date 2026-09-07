@@ -144,7 +144,7 @@ assertion) must be reverted and `git status` re-checked clean.
 
 ## 7. Math companion (required deliverable, every issue)
 
-Every issue produces or extends `VanillaZkVM/math-companion.md` — the pen-and-paper statements that
+Every issue produces or extends `docs/math-companion.md` — the pen-and-paper statements that
 match the Lean, kept in lockstep (the precedent Dmitry set on the `memory-integration` branch). For
 each new public definition or headline theorem, the companion states it in ordinary mathematical
 notation with the paper citation, so a reviewer can compare *paper ↔ companion ↔ Lean* without

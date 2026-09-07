@@ -73,7 +73,8 @@ private def combExtract (w : CombProof) : CombineWitness exactVC (SegWitness exa
   ⟨mapProof w.proofL, mapProof w.proofR, w.Smid, w.NL, w.NR⟩
 
 private theorem assumptions : system.Assumptions := by
-  refine ⟨?_, ?_, ?_, ?_⟩
+  refine ⟨?_, ?_, ?_, ?_, exactVC_complete, exactVC_positionBinding,
+    exactVC_updateBinding⟩
   · -- KS of leaf: identity extractor
     refine ⟨⟨fun _ p => p⟩, ?_⟩
     intro st p hp
@@ -129,7 +130,7 @@ example : system.toZkVM.step fullState fullState := by
     ISA.System.operation, isa, memFree, fullState]
 
 example : system.toZkVM.CTE :=
-  system.cte assumptions exactVC_complete exactVC_positionBinding exactVC_updateBinding
+  system.cte assumptions
 
 end MultiStepSanity
 end VanillaZkVM

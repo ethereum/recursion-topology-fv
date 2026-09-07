@@ -159,8 +159,8 @@ implementations remain outside this issue.
 The reusable declarations in `VMs/Bus.lean` depend only on the commitment
 scheme, segment length, representative ISA, and segment/inner verifiers. The
 non-recursive execution and CTE demonstration is deliberately isolated in
-`VMs/TwoStep/WithBus.lean`; Issue 7 can consume the same one-segment system from
-the recursive VM without importing the two-layer connection module.
+`VMs/TwoStep/WithBus.lean`; the Issue 7 assembly consumes the same one-segment
+system from the recursive VM without importing the two-layer connection module.
 
 Human review must verify four points independently. First,
 `stepWithBus_committedOperation` must derive the existing
@@ -210,10 +210,30 @@ must approve the concrete choice of lists for the paper's bus collections.
 | multi-step CTE over full memory (`def:cte`, `prop:memory-extractability`) | `MultiStep.System.cte` | proved | — | — | _unreviewed_ |
 | — (joint satisfiability model, I6) | `VMs/MultiStep/MultiStepSanity.lean` (all declarations private — no public name to `#check`) | n/a | — | — | _unreviewed_ |
 
+## Full Vanilla VM assembly (Issue 7)
+
+The assembled system uses `Bus.System.segment_extract` to prove that an
+accepted base segment proof yields the valid committed trace required by the
+recursive `MultiStep` theorem. It does not assume this fact independently. Its
+verifier commits the initial and final full-memory states before invoking the
+embed verifier, and its only plain execution predicate remains
+`ISA.System.stepPlain`.
+
+The private model in `VMs/VanillaVM/VanillaVMSanity.lean` witnesses that the
+complete assumption structure and an accepted proof can occur together. Human
+review must confirm that this structure lists every probability-free
+assumption used by the paper and that the private connection to the recursive
+system preserves the `MemStep` recovered by the bus proof. This theorem
+deliberately omits the paper's numerical advantage bound, which remains Issue 6.
+
+| Paper label | Lean declaration | Status | Fidelity | Complete | Reviewer |
+|---|---|---|---|---|---|
+| full zkVM with committed memory boundaries (`def:zkvm`, paragraph after `eq:relation-star`) | `VanillaZkVM.VanillaVM.System` / `VanillaZkVM.VanillaVM.System.toMultiStep` / `VanillaZkVM.VanillaVM.System.toZkVM` | proved | — | — | _unreviewed_ |
+| main CTE theorem, perfect-model form (`thm:main`) | `VanillaZkVM.VanillaVM.System.Assumptions` / `VanillaZkVM.VanillaVM.System.cte_main` | proved | — | ✗ (Issue 6 adds the advantage bound) | _unreviewed_ |
+
 ## Planned (owned by issues — see PLAN.md)
 
 | Paper label | Lean declaration (planned name) | Owner issue |
 |---|---|---|
-| main theorem (`thm:main`) | `VanillaVM.cte_main` | Issue 7 |
-| advantage / negligibility vocabulary | _name pending Issue-10 definition review_ | Issue 10 |
+| explicit-advantage vocabulary at fixed parameters | _name pending Issue-10 definition review_ | Issue 10 |
 | per-layer reduction bounds + `thm:main` weighted sum | _name pending Issue-6 definition review_ | Issue 6 |

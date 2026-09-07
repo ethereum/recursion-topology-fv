@@ -222,27 +222,19 @@ def ASEmbed : ArgumentSystem sys.REmbed where
   Proof := sys.EmbedProof
   verify := sys.embedVerify
 
-/-! ## Trust base -/
+/-! ## Assumptions -/
 
-/-- **Trust base for the recursion tower** — the single surface collecting the
-unproven assumptions `committedTrace_extract` relies on: knowledge soundness of
-all four SNARKs, which is exactly the trust base ch04 charges its layer lemmas
-with.
+/-- **Assumptions for the recursive zkVM.** This structure collects knowledge
+soundness of the four proof systems and the three memory-commitment properties
+used by the full-memory CTE theorem. Keeping them together makes every
+cryptographic assumption of `cte` visible in one argument.
 
-The memory-commitment properties (`Complete`/`PositionBinding`/`UpdateBinding`)
-are deliberately *not* bundled here. They are properties of `Com_mem` (ch02
-`def:binding`), not of the recursion tower, and they are consumed only by the
-ch05 bridge — `memoryBridge`, `traceValid_full`, and the full-memory statement
-`cte` take them as separate hypotheses, which keeps the tree-unrolling half
-charged with KS alone and lets a concrete `VectorCommitment` discharge them by
-construction (`MemorySanity` does, for `exactVC`). Same split as
-`TwoStep.System.Assumptions`; the one all-encompassing trust base is Issue 7's
-`cte_main`. The well-formedness side conditions `hNseg`/`hDvd`/`hT` are not part
-of the trust base either, nor is the fixed program `isa` — those are data and
-side conditions carried by `System`.
+The segment length, divisibility, total-step bound, and fixed program are
+ordinary system parameters rather than security assumptions, so they remain in
+`System`.
 
-Paper: `lem:convert`/`lem:combine`/`lem:embed` (ch04); the SNARK half of the
-assumptions charged in `thm:main` (ch05). -/
+Paper: `lem:convert`/`lem:combine`/`lem:embed` (ch04),
+`prop:memory-extractability`, and the assumptions charged in `thm:main` (ch05). -/
 structure Assumptions (sys : System) : Prop where
   /-- Knowledge soundness of the leaf/segment SNARK `Π_leaf`. -/
   ksLeaf : KnowledgeSound sys.ASLeaf
@@ -252,6 +244,12 @@ structure Assumptions (sys : System) : Prop where
   ksConvert : KnowledgeSound sys.ASConvert
   /-- Knowledge soundness of the embed SNARK `Π_4`. -/
   ksEmbed : KnowledgeSound sys.ASEmbed
+  /-- Openings produced from an honestly committed memory are accepted. -/
+  complete : sys.VC.Complete
+  /-- One memory commitment cannot open to two values at one address. -/
+  positionBinding : sys.VC.PositionBinding
+  /-- An accepted write commitment represents the correctly updated memory. -/
+  updateBinding : sys.VC.UpdateBinding
 
 /-! ## Committed trace validity -/
 
@@ -454,6 +452,9 @@ committed trace from `x.S0` to `x.ST` of length `T`.
 
 The extractor exhibited is `buildTrace` run on the combine proof that embed
 extraction returns — a named procedure, not a choice from an existential.
+This theorem uses the four proof-system fields of `Assumptions`; the memory
+fields in the same structure are used later by `cte` to reconstruct full
+memory.
 
 Paper: `lem:embed` composed with `lem:combine` tree unrolling (ch04). -/
 theorem committedTrace_extract (h : sys.Assumptions) :
@@ -461,7 +462,7 @@ theorem committedTrace_extract (h : sys.Assumptions) :
       ∀ (x : EmbedStmt sys.VC) (p : sys.EmbedProof),
         sys.embedVerify x p →
           sys.CommittedTraceValid x.S0 x.ST (E x p) sys.T := by
-  obtain ⟨ksLeaf, ksCombine, ksConvert, ksEmbed⟩ := h
+  obtain ⟨ksLeaf, ksCombine, ksConvert, ksEmbed, _, _, _⟩ := h
   obtain ⟨El, hEl⟩ := ksLeaf
   obtain ⟨Ecb, hEcb⟩ := ksCombine
   obtain ⟨Ec, hEc⟩ := ksConvert
@@ -542,9 +543,9 @@ theorem traceValid_full
     exact sys.isa.committedOperation_stepPlain _ _ _ _ _
       (hinv i (by omega)) (hinv (i + 1) (by omega)) (hopC i hi) (hstepF i hi)
 
-/-- **CTE for the multi-step VM.** Under KS of all four SNARKs and the memory
-commitment binding assumptions, the multi-step VM is correct-trace extractable
-over full-memory states, with `ZkVM.step` the fixed-program ISA predicate.
+/-- **CTE for the multi-step VM.** Under its collected proof-system and memory
+commitment assumptions, the multi-step VM is correct-trace extractable over
+full-memory states, with `ZkVM.step` the fixed-program ISA predicate.
 
 The two halves meet here: `committedTrace_extract` supplies the explicit
 committed-trace extractor (`buildTrace` under an embed extraction), and
@@ -552,15 +553,9 @@ committed-trace extractor (`buildTrace` under an embed extraction), and
 that named procedure composed with reconstruction — no choice principle is
 applied to the conclusion.
 
-The three commitment hypotheses sit beside `Assumptions` rather than inside it
-by design: `Assumptions` is the recursion tower's trust base, and these belong
-to `Com_mem`. See the note on `Assumptions`.
-
 Paper: `def:cte`, `prop:memory-extractability`, `rem:mem-inheritance` (ch05),
 and `lem:convert`/`combine`/`embed` (ch04). -/
-theorem cte (h : sys.Assumptions)
-    (hComplete : sys.VC.Complete) (hpos : sys.VC.PositionBinding)
-    (hupd : sys.VC.UpdateBinding) :
+theorem cte (h : sys.Assumptions) :
     sys.toZkVM.CTE := by
   obtain ⟨E, hE⟩ := sys.committedTrace_extract h
   exact ⟨fun x p =>
@@ -568,7 +563,7 @@ theorem cte (h : sys.Assumptions)
         (chooseMemStep sys.isa.committedOperation
           (E ⟨toCommitted x.S0, toCommitted x.ST⟩ p)) x.S0,
     fun x p hp =>
-      sys.traceValid_full hComplete hpos hupd x _
+      sys.traceValid_full h.complete h.positionBinding h.updateBinding x _
         (hE ⟨toCommitted x.S0, toCommitted x.ST⟩ p hp)⟩
 
 end System

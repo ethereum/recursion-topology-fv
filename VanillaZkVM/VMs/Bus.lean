@@ -28,14 +28,10 @@ entries recorded in the segment's bus.
 * `System.stepWithBus_committedOperation` — a bus-checked transition satisfies
   the existing committed ISA operation with the same memory witness.
 * `System.segment_extract` — an accepted segment proof yields a valid segment
-  trace using one internally consistent bus.
+  trace in which the step, Keccak, Poseidon, and range-check proofs use the same
+  bus.
 
-This file does not choose how segment proofs are combined into a final proof. A
-non-recursive two-layer demonstration lives in `VMs/TwoStep/WithBus.lean`; the
-recursive VanillaVM can reuse the segment relation and `segment_extract` as its
-first proof layer. The bus conditions support the existing
-`ISA.System.stepPlain` execution rule; they do not define a second VM execution
-rule.
+This file does not choose how segment proofs are combined into a final proof.
 
 Paper: bus layout in ch02; `eq:step-expanded`, `eq:step-bus2`,
 `eq:rel-inner-step`, the three inner-chip relations, `R_1`, and `lem:segment`.

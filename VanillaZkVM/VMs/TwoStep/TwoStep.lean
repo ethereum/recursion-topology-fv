@@ -208,18 +208,28 @@ theorem memoryBridge
   refine ⟨S₂, hInv₂, ?_⟩
   exact sys.isa.committedOperation_stepPlain S₁ S₂ Ŝ₁ Ŝ₂ w hInv hInv₂ hw hfull
 
-/-- **Trust base for the two-step zkVM** — the single surface collecting the
-unproven assumptions `committedTrace_extract` relies on. This toy system uses no bus, so its trust
-base is exactly the two SNARKs' knowledge soundness. The full-memory statement
-`cte` additionally consumes the memory-commitment binding assumptions
-(`Complete`/`PositionBinding`/`UpdateBinding`), which are passed separately rather
-than bundled here. The well-formedness side condition `0 < Nseg` is *not* part of
-the trust base and stays a separate argument. -/
+/-- **Assumptions for the two-step zkVM.** This structure collects the two proof
+systems' knowledge-soundness assumptions and the three properties used to
+reconstruct full memory. Keeping these facts together makes every
+cryptographic assumption of `cte` visible in one argument.
+
+The arithmetic side condition `0 < Nseg` describes the shape of this particular
+VM and remains a separate argument.
+
+Paper: the two proof-system assumptions and the memory-commitment assumptions
+used by `prop:memory-extractability` and `thm:main` (ch05), specialized to this
+non-recursive toy. -/
 structure Assumptions (sys : System) : Prop where
   /-- Knowledge soundness of the segment SNARK `Π_seg`. -/
   ksSeg : KnowledgeSound sys.ASSeg
   /-- Knowledge soundness of the final merging SNARK `Π_final`. -/
   ksFinal : KnowledgeSound sys.ASFinal
+  /-- Openings produced from an honestly committed memory are accepted. -/
+  complete : sys.VC.Complete
+  /-- One memory commitment cannot open to two values at one address. -/
+  positionBinding : sys.VC.PositionBinding
+  /-- An accepted write commitment represents the correctly updated memory. -/
+  updateBinding : sys.VC.UpdateBinding
 
 /-- **The `Memory` ↔ `TwoStep` bridge** — a valid committed trace yields a valid
 *full-memory* trace of `toZkVM`: the reconstructed trace
@@ -295,12 +305,14 @@ from `x.S0` to `x.ST`. The extractor runs the two-layer straight-line extraction
 resulting committed sub-traces. Validity of the concatenation is `chain_flatten`.
 
 This is the SNARK-composition half of `cte`. Its conclusion is a committed trace,
-which `traceValid_full` then lifts to the full-memory trace `cte` needs. -/
+which `traceValid_full` then lifts to the full-memory trace `cte` needs. This
+theorem uses the two proof-system fields of `Assumptions`; the memory fields in
+the same structure are used by that later reconstruction. -/
 theorem committedTrace_extract (hNseg : 0 < sys.Nseg) (h : sys.Assumptions) :
     ∃ E : FinalStmt sys.VC → sys.FinalProof → (ℕ → CommittedVMState sys.VC),
       ∀ (x : FinalStmt sys.VC) (p : sys.FinalProof),
         sys.finalVerify x p → sys.CommittedTraceValid x (E x p) := by
-  obtain ⟨hseg, hfinal⟩ := h
+  obtain ⟨hseg, hfinal, _, _, _⟩ := h
   obtain ⟨Ef, hEf⟩ := hfinal
   obtain ⟨Es, hEs⟩ := hseg
   -- The trace-extractor: extract the RFinal witness, then flatten the per-segment
@@ -353,9 +365,7 @@ Correctness is then exactly `traceValid_full` applied to `E`'s committed trace.
 Paper: `def:cte`, `prop:memory-extractability`, and `rem:mem-inheritance`
 (ch05). This is a two-layer memory theorem, not the full VanillaVM main
 theorem. -/
-theorem cte (hNseg : 0 < sys.Nseg) (h : sys.Assumptions)
-    (hComplete : sys.VC.Complete) (hpos : sys.VC.PositionBinding)
-    (hupd : sys.VC.UpdateBinding) :
+theorem cte (hNseg : 0 < sys.Nseg) (h : sys.Assumptions) :
     sys.toZkVM.CTE := by
   obtain ⟨E, hE⟩ := sys.committedTrace_extract hNseg h
   exact ⟨fun x p =>
@@ -363,7 +373,7 @@ theorem cte (hNseg : 0 < sys.Nseg) (h : sys.Assumptions)
         (chooseMemStep sys.isa.committedOperation
           (E ⟨toCommitted x.S0, toCommitted x.ST⟩ p)) x.S0,
     fun x p hp =>
-      sys.traceValid_full hComplete hpos hupd x _
+      sys.traceValid_full h.complete h.positionBinding h.updateBinding x _
         (hE ⟨toCommitted x.S0, toCommitted x.ST⟩ p hp)⟩
 
 end System

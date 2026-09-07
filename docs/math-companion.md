@@ -80,8 +80,9 @@ witnesses are traces `tr`, and `(x ; tr) ∈ R*` iff `tr` is valid for `x`.
 This is the abstract trace-validity skeleton only. It neither requires `Stmt` to
 contain full-memory boundary states nor constrains `verify` to commit them as in
 the concrete verification algorithm immediately following `eq:relation-star`.
-The full Vanilla VM instance must supply that boundary/verifier package in
-Issue 7; hence the current correspondence row is faithful but incomplete.
+The full Vanilla VM instance in §7 supplies that boundary/verifier package.
+The abstract `Rstar` declaration remains intentionally generic, so its own
+correspondence row records only the trace-validity skeleton.
 
 **Correct-trace extractability `CTE`** (`def:cte`, ch05). `V` is CTE iff there is a
 trace-extractor `E : Stmt × Proof → (ℕ → State)` such that
@@ -359,9 +360,11 @@ the committed-memory write verifies, but the second commitment has no
 full-memory representative. Thus dropping update binding would
 make the frozen bridge conclusion false, not merely harder to prove.
 
-This is not yet the full VanillaVM theorem. The representative ISA remains
-abstract inside each operation's PC/register predicate, and the bus, recursion,
-and explicit quantitative reductions remain separate layers in `docs/PLAN.md`.
+This remains the non-recursive toy theorem. Section 7 assembles the bus and
+recursion layers into the probability-free VanillaVM theorem. The
+representative ISA still leaves each operation's exact PC/register behavior
+abstract, and explicit quantitative reductions remain separate work in
+`docs/PLAN.md`.
 
 ---
 
@@ -619,8 +622,11 @@ whole execution:
 
     ( (S₀, S_T) ; π ) ∈ R_4  :⟺  combineVerify (S₀, S_T, T) π = 1.
 
-**Trust base.** Knowledge soundness of all four argument systems
-`Π_leaf, Π_2, Π_3, Π_4`, giving straight-line extractors `E_leaf, E_c, E_cb, E_e`.
+**Assumptions.** Knowledge soundness of all four argument systems
+`Π_leaf, Π_2, Π_3, Π_4`, giving straight-line extractors `E_leaf, E_c, E_cb, E_e`,
+together with memory-commitment completeness, position binding, and update
+binding. Keeping these facts in one structure makes every hypothesis used by
+the full-memory CTE theorem visible at its call site.
 
 *Lean:* `RLeaf`/`ASLeaf`, `RConvert`/`ASConvert`, `RCombine`/`ASCombine`,
 `REmbed`/`ASEmbed`, `Assumptions`.
@@ -707,8 +713,8 @@ tree's height.
 ### 4.6 Embed and full-memory CTE
 
 Composing `R_4` extraction with §4.5 at `N = T` (legitimate since `N_seg ∣ T` and
-`T ≥ N_seg`) gives an explicit committed-trace extractor: under the trust base of
-§4.3,
+`T ≥ N_seg`) gives an explicit committed-trace extractor: under the assumptions
+of §4.3,
 
     E(x, π) := buildTrace( x.S₀, x.S_T, T, inr( E_e(x, π) ) )
 
@@ -788,7 +794,7 @@ accepting proofs), and that `cte`'s full hypothesis bundle is satisfiable.
 Its inner `CombineProof` slot is `Empty`, so the model exercises one combine node
 over two converts — the depth-1 tree. The self-recursive case (a combine whose
 child is itself a combine) is covered by the proof but not by this model; a
-deeper witness is worth adding when Issue 7 assembles the full VM.
+deeper private witness remains a possible additional sanity check.
 
 ### 4.8 What this is not
 
@@ -990,9 +996,9 @@ do not need to be equal. The boundary equalities alone join the state traces.
 Finally, the existing memory reconstruction theorem turns this committed trace
 into a full-memory trace satisfying `ISA.System.stepPlain`, proving CTE for the
 two-step VM whose segment proofs use buses.
-The convert/combine/embed recursion tower is formalized separately in §4 over
-an abstract leaf. Connecting that tower to this bus-backed segment layer remains
-part of the final assembly in Issue 7.
+The convert/combine/embed recursion tree is formalized separately in §4, where
+its base segment proof is left abstract. Section 7 supplies the bus-checked
+segment proof for that base case.
 
 *Lean:* `Bus.TwoStepSystem`, `Bus.TwoStepSystem.Execution`,
 `Execution.trace`, `Execution.Valid`, `execution_extract`, `toZkVM`, and `cte`.
@@ -1001,3 +1007,110 @@ buses are deliberately unequal, while all assumptions and the CTE theorem
 remain satisfiable. It separately exercises the Poseidon and range-check
 transition branches and rejects buses missing the required hash or range
 entry.
+
+---
+
+## 7. Full Vanilla VM assembly (Issue 7)
+
+### 7.1 Connecting segment proofs to recursion
+
+Let `B` be the segment system of §5 and let the recursive parameters and
+verifiers be those of §4, with the same memory commitment, representative ISA,
+and segment length as `B`. The assembled system uses the segment verifier of §5
+as the base verifier of §4:
+
+    leafVerify((Ŝ₀,Ŝ_N,N), π)
+      := B.segmentVerify((Ŝ₀,Ŝ_N), π).
+
+The convert relation already requires `N=N_seg`, so the segment statement does
+not need a second step-count field.
+
+This substitution does **not** add a separate assumption about extracting the
+base segment proof. Given the assumptions of `segment_extract`, recover
+
+    tr = (bus, states, memorySteps)
+
+from an accepted base segment proof. For every `j<N_seg`, segment validity gives
+
+    B.stepWithBus(states(j), states(j+1), (bus,memorySteps(j))).
+
+The theorem `stepWithBus_committedOperation` then gives
+
+    committedOperation(states(j), states(j+1),memorySteps(j)),
+
+which is exactly the base relation expected by the recursive system. Thus the
+bus theorem supplies the segment extractor required by `MultiStep.cte`;
+assuming it separately would bypass the bus checks rather than connect the two
+layers.
+
+*Lean:* `VanillaVM.System`, `VanillaVM.System.toMultiStep`; the helper that
+connects the segment theorem to the recursive theorem is private because no
+later module needs this intermediate result as a separate public theorem.
+
+### 7.2 The assembled zkVM and its assumptions
+
+The final zkVM is the `MultiStep` instance after the substitution above:
+
+    State   := FullVMState(VC),
+    step    := isa.stepPlain,
+    T       := T,
+    Proof   := EmbedProof,
+    verify((S₀,S_T),π)
+      := embedVerify((toCommitted(S₀),toCommitted(S_T)),π).
+
+In particular, the public full-memory boundary states are converted to
+committed boundary states using `VC.commit`; this is the boundary-commitment
+step required immediately after `eq:relation-star`.
+
+The one assumption structure contains precisely the cryptographic facts that
+the final theorem takes as inputs rather than proving itself:
+
+1. collision resistance of the segment-bus commitment;
+2. knowledge soundness of the segment proof and its four inner proofs;
+3. knowledge soundness of the convert, combine, and embed proofs; and
+4. completeness, position binding, and update binding of the memory
+   commitment.
+
+There is no separate assumption about extracting the base segment proof,
+because §7.1 derives it from items 1--2.
+The segment length, divisibility of `T`, and the lower bound
+`T≥2·N_seg` are checked construction parameters, not cryptographic assumptions.
+
+*Lean:* `VanillaVM.System.toZkVM`, `VanillaVM.System.Assumptions`.
+
+### 7.3 Main probability-free theorem
+
+Under the assumptions of §7.2,
+
+    CTE(VanillaVM.toZkVM).
+
+The extractor is the following composition of the already-proved layers:
+
+1. extract the embed proof and recursively unroll its combine tree;
+2. at every base segment, use segment extraction to recover committed states,
+   the `MemStep` values used by the bus checks, and one bus shared by the step,
+   Keccak, Poseidon, and range-check proofs;
+3. stop carrying the bus only after the bus-to-committed-operation theorem has
+   shown that every recovered transition follows the fixed program; and
+4. reconstruct full memory from the known initial state and the committed
+   trace, obtaining a trace of `isa.stepPlain` between the claimed full-memory
+   endpoints.
+
+This is the perfect, probability-free form of `thm:main`. It verifies the chain
+of implications from the layer assumptions to trace extraction, but it does
+not formalize success probabilities or running times and therefore does not
+prove a concrete security level. The paper's `rem:idealized` also warns that
+its straight-line recursive extraction assumes an idealized relativized SNARK.
+Issue 6 is responsible for the explicit advantage bound; Issue 10 supplies the
+quantitative vocabulary.
+
+*Lean:* `VanillaVM.System.cte_main`.
+
+`VMs/VanillaVM/VanillaVMSanity.lean` provides a private two-step example in
+which the complete assumption structure holds and the final verifier accepts a
+proof. Both segments record an actual Keccak call in a nonempty bus. Its
+plain-step relation also accepts the represented hash transition.
+For simplicity, its commitments store their inputs directly and its proofs
+contain the values returned by their extractors. The example shows that all
+assumptions can hold together; it does not establish the security of a
+deployed construction.

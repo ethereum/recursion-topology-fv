@@ -26,8 +26,8 @@ stepCommitted
 `V.step` is the single canonical **plain** step predicate. Issue 3's
 `ISA.System.stepPlain` is the predicate assigned to that field by a concrete
 Vanilla `ZkVM`; it must not become a second, disconnected top-level execution
-relation. `TwoStep.System.toZkVM` now makes this assignment in the public
-two-layer toy, while Issue 7 will reuse it in the assembled Vanilla VM.
+relation. `TwoStep.System.toZkVM` makes this assignment in the public two-layer
+toy, and `VanillaVM.System.toZkVM` reuses it in the assembled recursive VM.
 
 `stepCommitted` relates two committed states. Operation-specific data and
 opening proofs may be carried by internal predicates. In the two-layer toy,
@@ -97,8 +97,8 @@ equates them.
 | Layer | Designated module | Required realization |
 |---|---|---|
 | Memory reconstruction | `VanillaZkVM/VMs/Memory.lean` + concrete VM module (Issue 1 / #7) | `VMs/Memory.lean` defines `CommitInv`, the memory-only step predicates, `step_reconstruct_exact`, `step_reconstruct`, and `trace_mem_extract`. The concrete VM packages the appropriate committed relation as a `StepInterface` and proves `MemoryBridge`; `VMs/TwoStep/TwoStep.lean` supplies the current instance. |
-| Plain ISA semantics | `VanillaZkVM/VMs/ISA.lean` (Issue 3 / #9) | Define `ISA.System.stepPlain`, connect explicit committed-memory witnesses through `ISA.System.committedOperation`, and assign `stepPlain` directly to `TwoStep.System.toZkVM.step`. Issue 7 reuses the same predicate in the assembled VM. |
-| Segment bus | `VanillaZkVM/VMs/Bus.lean` + concrete VM connection module (Issue 5 / #11) | `Bus.System.stepWithBus` combines the segment step check with the three chip checks. `Bus.System.stepWithBus_committedOperation` proves the implication to the Issue 3 committed ISA operation while preserving the recovered `MemStep`, and `Bus.System.segment_extract` proves that the four buses recovered for one segment are equal. Neither theorem chooses how segments are combined. `VMs/TwoStep/WithBus.lean` uses that `MemStep` to satisfy `StepInterface.BusBridge` and demonstrates whole-execution extraction; Issue 7 can reuse the same segment system with the recursive VM. |
+| Plain ISA semantics | `VanillaZkVM/VMs/ISA.lean` (Issue 3 / #9) | Define `ISA.System.stepPlain`, connect explicit committed-memory witnesses through `ISA.System.committedOperation`, and assign `stepPlain` directly to both the toy and assembled `ZkVM` instances. |
+| Segment bus | `VanillaZkVM/VMs/Bus.lean` + concrete VM connection modules (Issues 5 and 7) | `Bus.System.stepWithBus` combines the segment step check with the three chip checks. `Bus.System.stepWithBus_committedOperation` proves the implication to the Issue 3 committed ISA operation while preserving the recovered `MemStep`, and `Bus.System.segment_extract` proves that the four buses recovered for one segment are equal. Neither theorem chooses how segments are combined. `VMs/TwoStep/WithBus.lean` demonstrates the non-recursive connection; `VMs/VanillaVM/VanillaVM.lean` derives the recursive leaf extractor from the same segment theorem. |
 
 No other module should introduce a different, unrelated public execution
 predicate between two states.

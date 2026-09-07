@@ -24,6 +24,8 @@ import VanillaZkVM.VMs.TwoStep.WithBus                 -- connects the reusable 
 import VanillaZkVM.VMs.TwoStep.WithBusSanity           -- consistency model for that connection
 import VanillaZkVM.VMs.MultiStep.MultiStep             -- binary-recursion-tree zkVM (convert / combine / embed)
 import VanillaZkVM.VMs.MultiStep.MultiStepSanity       -- accepting model for the multi-step theorem
+import VanillaZkVM.VMs.VanillaVM.VanillaVM             -- recursive zkVM with bus-checked segments and main CTE theorem
+import VanillaZkVM.VMs.VanillaVM.VanillaVMSanity       -- accepting model for the assembled theorem
 
 /-!
 # VanillaZkVM — umbrella module
@@ -38,6 +40,6 @@ list; there are no back-edges.
   `ZkVM`, `TraceValid`, `Rstar`, `CTE`, `cte_iff_knowledgeSound`).
 * `VMs/` — concrete VM machinery: state vocabulary, the step-interface contract,
   committed-memory reconstruction, the representative ISA, the per-segment bus,
-  the two-step variants, and the multi-step recursion tower that instantiate the
-  specification.
+  the two-step variants, the multi-step recursion tower, and the final
+  recursive VM with bus-checked segments that instantiate the specification.
 -/

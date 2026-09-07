@@ -185,12 +185,13 @@ private theorem segmentAssumptions : segmentSystem.Assumptions := by
       segmentVerify] using hverify
 
 private theorem assumptions : system.Assumptions := by
-  refine ⟨segmentAssumptions, ?_⟩
-  refine ⟨⟨fun _ proof => proof⟩, ?_⟩
-  intro statement proof hverify
-  simpa [Bus.TwoStepSystem.toTwoStep, TwoStep.System.ASFinal,
-    TwoStep.System.RFinal, system, segmentSystem, finalVerify,
-    segmentVerify] using hverify
+  refine ⟨segmentAssumptions, ?_, MemorySanity.exactVC_complete,
+    MemorySanity.exactVC_positionBinding, MemorySanity.exactVC_updateBinding⟩
+  · refine ⟨⟨fun _ proof => proof⟩, ?_⟩
+    intro statement proof hverify
+    simpa [Bus.TwoStepSystem.toTwoStep, TwoStep.System.ASFinal,
+      TwoStep.System.RFinal, system, segmentSystem, finalVerify,
+      segmentVerify] using hverify
 
 /-! ## An accepted two-segment execution with different buses -/
 
@@ -278,8 +279,6 @@ private theorem rejects_missing_range_entry :
 
 private example : system.toZkVM.CTE := by
   exact system.cte (by simp [system, segmentSystem]) assumptions
-    MemorySanity.exactVC_complete MemorySanity.exactVC_positionBinding
-    MemorySanity.exactVC_updateBinding
 
 end BusTwoStepSanity
 end VanillaZkVM

@@ -349,8 +349,10 @@ implementations remain absent. `VMs/MultiStep/MultiStep.lean` formalizes the
 recursive convert/combine/embed proof tower over an abstract segment proof. Its
 recursive extractor constructs and joins the committed traces recovered from the
 tree, and its CTE theorem then applies the existing memory reconstruction. The
-former playground `Bus.lean` is still only git-history reference material; the
-current file is a new Issue 5 implementation against the frozen interfaces.
+final `VMs/VanillaVM/VanillaVM.lean` assembly uses the bus-checked segment
+verifier for that base case and proves the probability-free main CTE theorem.
+The former playground `Bus.lean` is still only git-history reference material;
+the current file is a new Issue 5 implementation against the frozen interfaces.
 
 **(a) Committed memory / memory-commitment properties — memory core connected
 to the representative ISA.** `VMs/Memory.lean` now formalizes the perfect
@@ -373,7 +375,8 @@ suitable memory witness.
 Explicit advantage/reduction accounting remains the Issue 8 study and Issues
 10 and 6 in `PLAN.md` (the former Issue 2 was withdrawn).
 
-**(b) Multi-layer recursion — structure implemented over an abstract leaf.**
+**(b) Multi-layer recursion — abstract recursion and concrete segment
+connection implemented.**
 `VMs/MultiStep/MultiStep.lean` formalizes the leaf, convert, combine, and embed
 relations. Its explicit, terminating `buildTrace` extractor follows the binary
 proof tree, and `combine_tree` proves that it joins the recovered child traces
@@ -382,9 +385,10 @@ the combine relation's size conditions guarantee that each recursive child is
 strictly smaller. `committedTrace_extract` obtains the committed execution, and
 the MultiStep CTE theorem reconstructs its full-memory execution.
 `VMs/MultiStep/MultiStepSanity.lean` supplies a small accepted example showing
-that these assumptions can hold together. The remaining integration task is to
-instantiate the abstract leaf with `Bus.System.RSegment` and its extraction
-theorem, rather than to reimplement recursion. The quantitative `(m-1)`
+that these assumptions can hold together. `VMs/VanillaVM/VanillaVM.lean` uses
+the bus-checked segment verifier for the recursion's base proofs and derives
+the required extraction guarantee from `Bus.System.segment_extract`; it does
+not assume a separate bus-free segment theorem. The quantitative `(m-1)`
 accounting remains deferred to Issue 6.
 
 **(c) Representative ISA operations — structure implemented, exact opcodes
@@ -409,8 +413,9 @@ separate bus `B̂_i` and `MemStep` sequence, and reuses
 `concatTrace`/`chain_flatten` to obtain one committed-state trace. It then uses
 the existing memory reconstruction theorem to prove CTE for the non-recursive
 two-step VM. The sanity model accepts two segments with provably different
-buses. Issue 7 can reuse the segment theorem with the recursive VM; concrete
-chip implementations remain outside Issue 5.
+buses. The Issue 7 assembly reuses the segment theorem for the base proofs of
+the recursive VM; concrete chip implementations remain outside the current
+model.
 
 **(e) Explicit reductions to hardness assumptions — systematically absent.**
 `Preliminaries/` is deliberately **perfect/probability-free** (`KnowledgeSound`
@@ -418,35 +423,31 @@ is `∃E,∀ x p, verify→rel`, no adversary/`λ`/`negl`/`Adv(·)`/running time
 Consequences: no notion of advantage (`Adv^ks_Π`, `Adv^pos_Com`,
 `Adv^upd_Com`, `Adv^cr_Com`) anywhere, so `thm:main`'s weighted sum of
 advantage terms (each with an explicit reduction adversary and running time
-`Time(A)+poly(λ)`) has no Lean counterpart — the *qualitative* skeleton
-(compose extractors layer by layer) exists in
-`TwoStep.System.committedTrace_extract`, but with no error accumulation: a perfect-KS proof composes
-"for free" (no union bound needed), unlike the real bound's scaling with `m`
-and `T`. No PPT-adversary type, no security-parameter families, no
+`Time(A)+poly(λ)`) has no Lean counterpart. The probability-free proof chain
+now culminates in `VanillaVM.System.cte_main`, but it has no failure
+probabilities to add together. Unlike the paper's real bound, it therefore has
+no factors depending on `m` or `T`. There is no PPT-adversary type, no
+security-parameter families, no
 negligibility predicate, no explicit reduction-adversary construction (the
 paper spells these out per-lemma, e.g. `D_3^(t)`: "run `A` once, unroll the
 tree to node `t`, forward to the `Π_3` challenger" — no challenger/experiment
-formalism exists in Lean at all), no running-time bookkeeping. Formalizing
-the *real* theorem (not just its proof skeleton) needs: (1) a
-probabilistic/PPT-adversary layer (e.g. via `PMF`, as `Preliminaries/ArgumentSystem.lean`'s own
-docstring flags as future work); (2) redefining `KnowledgeSound`/
-`PositionBinding`/`UpdateBinding`/`CollisionResistant` as `≤negl(λ)`-bounded
-advantages; (3) reproving all five layer lemmas + memory-extractability as
-genuine probabilistic reductions with union bounds (`(m-1)·`, `m·`,
-`Σ_{k=1}^T` coefficients); (4) tracking reduction running times through the
-composition. None of these exist yet.
+formalism exists in Lean at all), no running-time bookkeeping. Issues 10 and 6
+are scoped more narrowly than the paper's full asymptotic claim: they will add
+randomized experiments and explicit advantages at fixed parameters, then prove
+the concrete coefficient bound (`(m-1)·`, `m·`, and `Σ_{k=1}^T` terms).
+Security-parameter families, PPT predicates, negligibility, and formal running
+times remain outside that scope.
 
-Smaller gaps: the paper's CTE experiment derives `Ŝ_0,Ŝ_T` from plain
-`S_0,S_T` via `Commit` as part of verification (`rem:cte-ks`); Lean's
-`ZkVM.Stmt/initial/terminal` is fully abstract and imposes no such structure
-— even the outermost CTE statement isn't tied to `VMState`/`CommittedVMState`
-via `Com_mem`. The paper's own idealization caveat (`rem:idealized`: ROM
-straight-line extraction, non-existent relativized SNARKs for PCD
-composition) has no Lean counterpart since perfect KS sidesteps
-rewinding-vs-straight-line distinctions by fiat.
+The final verifier now derives `Ŝ_0,Ŝ_T` from plain `S_0,S_T` with `Com_mem`, so
+the boundary-commitment step is present in the assembled instance even though
+the reusable `ZkVM` specification remains abstract. Remaining semantic gaps
+include concrete opcode and chip implementations. The paper's own
+`rem:idealized` caveat also remains: perfect knowledge soundness records the
+straight-line extraction assumption but does not make a relativized SNARK
+exist or establish a concrete security level.
 
-**Implementation ordering:** [`PLAN.md`](PLAN.md) is authoritative. Issue 1
-implements the memory-only reconstruction slice in (a); the ISA, recursion,
-and bus gaps in (b)–(d) remain Issues 3–5. The quantitative re-foundation in
-(e) is the separate Issue-8 study and is not a prerequisite for the current
-perfect model.
+**Implementation ordering:** [`PLAN.md`](PLAN.md) is authoritative. Issues 1,
+3, 4, and 5 provide the memory, ISA, recursion, and bus layers; Issue 7 composes
+them into the probability-free main theorem. The quantitative re-foundation in
+Issues 10 and 6 follows the separate Issue-8 study and is not a prerequisite
+for the perfect model.

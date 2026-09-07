@@ -67,7 +67,8 @@ CORRESPONDENCE = REPO / "docs" / "CORRESPONDENCE.md"
 
 PERMITTED_AXIOMS = {"propext", "Classical.choice", "Quot.sound"}
 
-# Headline theorems whose axiom footprint CI pins. Append one line per issue.
+# Headline theorems whose axiom footprint CI pins. Add every theorem that an
+# issue treats as a principal result.
 HEADLINE_THEOREMS = [
     "VanillaZkVM.ZkVM.cte_iff_knowledgeSound",   # Issue 0 — keystone
     "VanillaZkVM.knowledgeSound_trivialAS",      # Issue 0 — non-vacuity floor
@@ -92,6 +93,7 @@ HEADLINE_THEOREMS = [
     "VanillaZkVM.Bus.TwoStepSystem.busBridge",  # Issue 5 — concrete step-interface bridge
     "VanillaZkVM.Bus.TwoStepSystem.execution_extract",  # Issue 5 — non-recursive per-segment execution
     "VanillaZkVM.Bus.TwoStepSystem.cte",       # Issue 5 — bus-backed two-step CTE
+    "VanillaZkVM.VanillaVM.System.cte_main",   # Issue 7 — recursive CTE with bus-checked segments
 ]
 
 # A Lean identifier: dotted, letters/digits/_/'  (no braces, no spaces).

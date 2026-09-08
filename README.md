@@ -102,3 +102,7 @@ Quot.sound}`.
 
 ## Contributing
 TBD
+
+## License
+
+Apache License 2.0. See [LICENSE](LICENSE).

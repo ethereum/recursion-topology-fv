@@ -3,38 +3,54 @@ import «recursion-topology-fv».Preliminaries.HashCommitment
 import «recursion-topology-fv».VMs.ISA
 
 /-!
-# Reusable segment-bus extraction
+# An example bus and segment extraction
 
-The segment trace does not check every expensive operation by itself. Instead,
-it records hash calls and range-check inputs in a bus. Three separate chip
-proofs check the Keccak, Poseidon, and range-check parts of that bus. The segment
-proof verifies those chip proofs together with the segment-trace proof under one
-public bus commitment.
+A *segment* is `Nseg` VM steps. Its *segment trace* is the list of its states. Some checks are expensive to do at each
+step: hash calls, or binary operations requiring range-checks. So we record them in a *bus*, and three *chips* check
+them separately:
 
-The paper calls the four smaller proofs “inner proofs” because one segment
-proof verifies all four of them. The step proof checks the segment's state
-transitions; the other three proofs check the Keccak, Poseidon, and range-check
-entries recorded in the segment's bus.
+```text
+  segment trace            bus                 chips
+   │ read, write, arith
+   │ hash (Keccak)    ──→  keccakCalls    ──→  Keccak
+   │ hash (Poseidon)  ──→  poseidonCalls  ──→  Poseidon
+   │ bin              ──→  rangeChecks    ──→  range
+   ▼
+```
+
+One segment has five proofs:
+
+```text
+              segment proof              verifies the four proofs below
+   ┌────────┬───────┴──────┬──────────┐
+  step    Keccak      Poseidon      range       inner proofs
+  proof   proof       proof         proof
+          └──────── chip proofs ────────┘
+```
+
+* The *step proof* (`RInnerStep`) checks each step. For a hash call or a range check, it checks
+  that the bus has an entry, not that the entry is correct.
+* Each *chip proof* (`RInnerKeccak`, `RInnerPoseidon`, `RInnerRange`) checks that all entries
+  of one bus list are correct.
+* The *segment proof* (`RSegment`) verifies the four *inner* proofs. "Inner" means "verified
+  inside the segment proof".
+
+The inner verifiers see only `busCom`, a hash of the bus. So extraction gives four buses, one
+from each inner proof. Collision resistance of the hash makes them equal (`segment_extract`).
 
 ## Main definitions
-* `SegmentBus` — the Keccak calls, Poseidon calls, and range-check inputs from
-  one segment.
-* `System.stepBus` and `System.stepWithBus` — the committed-state step before
-  and after the three bus checks are included.
-* `System.RSegment` — the segment relation that verifies the four inner proofs
-  under one bus commitment.
+* `SegmentBus` — the three lists of the bus.
+* `System` — all parameters: the program, the bus hash, and the five verifiers.
+* `System.stepBus` — one step, as the step proof checks it.
+* `System.stepWithBus` — the same step, plus the three chip checks.
 
 ## Main results
-* `System.stepWithBus_committedOperation` — a bus-checked transition satisfies
-  the existing committed ISA operation with the same memory witness.
-* `System.segment_extract` — an accepted segment proof yields a valid segment
-  trace in which the step, Keccak, Poseidon, and range-check proofs use the same
-  bus.
+* `System.stepWithBus_committedOperation` — a step that passes `stepWithBus` is a valid
+  `ISA.System.committedOperation` step.
+* `System.segment_extract` — from an accepted segment proof, we get a valid segment trace.
 
-This file does not choose how segment proofs are combined into a final proof.
-
-Paper: bus layout in ch02; `eq:step-expanded`, `eq:step-bus2`,
-`eq:rel-inner-step`, the three inner-chip relations, `R_1`, and `lem:segment`.
+Paper: Fig. `img:segments` (ch02); `eq:step-bus2`, `eq:rel-inner-step`, `R_1`, `def:bus-cr`,
+and `lem:segment`.
 -/
 
 namespace VanillaZkVM
@@ -42,8 +58,7 @@ namespace Bus
 
 /-! ## Data recorded in one segment's bus -/
 
-/-- The program counter and registers of a VM state, without memory. Hash and range operations
-must not change the memory commitment, so the bus does not store memory.
+/-- The program counter and registers of a VM state.
 
 Paper: the state data in the bus entries of ch03. -/
 structure BusState where
@@ -71,26 +86,16 @@ def HashCall.ofStates {Mem₁ Mem₂ : Type} (S₁ : VMStateWith Mem₁)
     (S₂ : VMStateWith Mem₂) : HashCall :=
   ⟨BusState.ofState S₁, BusState.ofState S₂⟩
 
-/-- The bus of one execution segment. The paper uses one mixed collection; here there are three
-lists, one for each chip. The bus commitment covers all three lists.
-
-Order and duplicates are part of the committed value, but the chip checks use only list
-membership. Extra valid entries are allowed, as discussed after `eq:step-expanded`.
+/-- The bus of one segment.
 
 Paper: the bus definition in ch03. -/
 structure SegmentBus where
-  /-- The Keccak calls. Only the Keccak proof receives them. -/
   keccakCalls : List HashCall
-  /-- The Poseidon calls. Only the Poseidon proof receives them. -/
   poseidonCalls : List HashCall
-  /-- The range-check inputs. Only the range proof receives them. -/
   rangeChecks : List BusState
 
 /-- The two hash checks represented by the ISA's single `hash` operation
 class. The fixed program says which one applies at each program counter.
-
-This is the five-class simplification of the separate Keccak and
-Poseidon operations in ch03.
 
 Paper: the Keccak and Poseidon branches of `eq:step-expanded` and
 `eq:step-bus2` (ch03). -/
@@ -120,7 +125,7 @@ structure SegmentStmt (VC : VectorCommitment) where
   /-- The committed output state. -/
   Sout : CommittedVMState VC
 
-/-- Public input of the inner segment-trace proof.
+/-- Public input of the inner step proof.
 
 Paper: public input of `R_{0,step}` in `eq:rel-inner-step` (ch04). -/
 structure InnerStepStmt (VC : VectorCommitment) (Digest : Type) where
@@ -131,7 +136,7 @@ structure InnerStepStmt (VC : VectorCommitment) (Digest : Type) where
   /-- The commitment to the segment bus. -/
   busCom : Digest
 
-/-- Data recovered from the inner segment-trace proof.
+/-- Data recovered from the inner step proof.
 
 Paper: witness of `R_{0,step}` in `eq:rel-inner-step` (ch04). -/
 structure SegmentTrace (VC : VectorCommitment) where
@@ -149,7 +154,7 @@ structure SegmentWitness (Digest InnerStepProof InnerKeccakProof
     InnerPoseidonProof InnerRangeProof : Type) where
   /-- The bus commitment. All four inner proofs are checked against it. -/
   busCom : Digest
-  /-- The inner segment-trace proof. -/
+  /-- The inner step proof. -/
   stepProof : InnerStepProof
   /-- The inner Keccak proof. -/
   keccakProof : InnerKeccakProof
@@ -190,9 +195,9 @@ structure System where
   SegmentProof : Type
   /-- The segment verifier. -/
   segmentVerify : SegmentStmt VC → SegmentProof → Prop
-  /-- The inner segment-trace proof. -/
+  /-- The inner step proof. -/
   InnerStepProof : Type
-  /-- The inner segment-trace verifier. -/
+  /-- The inner step verifier. -/
   innerStepVerify : InnerStepStmt VC BusDigest → InnerStepProof → Prop
   /-- The inner Keccak proof. -/
   InnerKeccakProof : Type
@@ -255,8 +260,8 @@ Paper: `φ_range(B)` in ch03. -/
 def rangeChip (bus : SegmentBus) : Prop :=
   ∀ state, state ∈ bus.rangeChecks → sys.rangePred state.pc state.regs
 
-/-- The committed transition predicate checked by the inner segment-trace
-circuit before the chip proofs are added.
+/-- The committed transition predicate checked by the inner step proof
+before the chip proofs are added.
 
 * reads, writes, and ordinary arithmetic use the existing
   `ISA.System.committedOperation` predicate;
@@ -269,7 +274,7 @@ The memory witness is explicit because read and write openings must remain
 available to the later memory-reconstruction proof.
 
 Paper: `φ̂_step,bus` in `eq:step-bus2` (ch03), under the five-class ISA
-simplification recorded in `docs/CORRESPONDENCE.md`. -/
+simplification. -/
 def stepBus (Ŝ₁ Ŝ₂ : CommittedVMState sys.VC)
     (w : MemStep sys.VC) (bus : SegmentBus) : Prop :=
   match sys.isa.code Ŝ₁.pc with
@@ -307,11 +312,9 @@ checked completely by `stepBus`.
 
 The conclusion preserves `aux.memory`, rather than merely proving that some
 memory witness exists. This lets the first extractor in a recursive proof
-retain the exact read/write opening recovered from the segment proof. It also
-implies the committed-step predicate between the two states required by
-`StepInterface.BusBridge`. A concrete VM can obtain that weaker statement by
-saying that `aux.memory` is the memory witness whose existence the interface
-requires.
+retain the exact read/write opening recovered from the segment proof. With
+`aux.memory` as the witness, it also gives `ISA.System.committedStep` between
+the two states.
 
 Paper: the implication from `eq:step-bus2` to the committed operation
 predicate used by `lem:segment` and `prop:memory-extractability`. -/
@@ -376,7 +379,7 @@ def RInnerStep : Relation where
       sys.stepBus (w.states j) (w.states (j + 1)) (w.steps j) w.bus) ∧
     st.busCom = sys.busHash w.bus
 
-/-- The inner segment-trace argument system `Π_{0,step}`.
+/-- The inner step argument system `Π_{0,step}`.
 
 Paper: the argument system for `R_{0,step}` in ch04. -/
 def ASInnerStep : ArgumentSystem sys.RInnerStep where
@@ -461,7 +464,7 @@ Paper: assumptions of `lem:segment`. -/
 structure Assumptions (sys : System) : Prop where
   /-- The bus commitment is collision resistant. -/
   collisionResistant : CollisionResistant sys.busCommitment
-  /-- The inner segment-trace proof is knowledge sound. -/
+  /-- The inner step proof is knowledge sound. -/
   innerStepSound : KnowledgeSound sys.ASInnerStep
   /-- The inner Keccak proof is knowledge sound. -/
   innerKeccakSound : KnowledgeSound sys.ASInnerKeccak
@@ -492,7 +495,7 @@ def segmentValid (st : SegmentStmt sys.VC)
 proof, recover the segment trace and its bus. The four proof extractors may
 initially return different buses, but each bus hashes to the digest in the
 segment witness. Collision resistance proves that the three chip buses equal
-the segment-trace bus, so all chip checks apply to that one bus.
+the bus of the step proof, so all chip checks apply to that one bus.
 
 The result retains the bus and memory witness of every transition. It does not
 compare this bus with the bus of any other segment.

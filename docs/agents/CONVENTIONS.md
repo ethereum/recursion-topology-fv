@@ -21,8 +21,8 @@ layer.
   (`cte_iff_knowledgeSound`, `chain_flatten`). **Names mirror the paper's vocabulary** — no
   invented jargon (`finality` enforces this in review).
 - **Declaration docstrings are ahistorical.** Describe *what a definition is / what a theorem
-  states* and cite the paper label (I1). Never write "renamed from", "replaces X", "previously" —
-  docstrings are read cold. (VCVio hard rule.)
+  states*. Never write "renamed from", "replaces X", "previously" — docstrings are read cold.
+  (VCVio hard rule.)
 - **`structure`, not `class`, for data/interfaces.** Abstract objects (`ZkVM`, `VectorCommitment`,
   a future `Reduction`) are plain `structure`s parameterized over their abstract pieces — matching
   both our code and VCVio/finality. Reserve typeclasses for genuine ambient capabilities, scoped as
@@ -36,27 +36,28 @@ layer.
 - **Scaffolding that is intentionally unused-yet is marked in its docstring** ("retained as
   scaffolding"), not deleted and not silently left dangling (VCVio pattern).
 
-## 2. Minimal-surface & anti-redundancy rules (I5, I10)
+## 2. Minimal-surface & anti-redundancy rules (I2, I6)
 
 - **Declare your new public surface in the PR.** List every new *public* definition and justify why
-  it can't be `private` or derived from a frozen/abstract one. Reviewers reject public defs that
+  it can't be `private` or derived from an abstract one. Reviewers reject public defs that
   duplicate an abstract notion.
 - **Derive, don't re-state.** New VM = instance of `ZkVM`. New relation = built via `Relation`. New
-  security property = phrased with the frozen predicates. If you find yourself copying the shape of
-  `KnowledgeSound`/`CTE`, stop — you almost certainly want to instantiate, not fork.
-- **One canonical step chain.** `ZkVM.step` is `stepPlain`. Committed-memory and bus-deferred
-  predicates connect through `StepInterface`; their concrete declarations live only in the modules
-  assigned by `docs/STEP_INTERFACES.md`. Do not introduce a parallel public binary "step" relation
-  in a convenience module.
+  security property = phrased with the core definitions (I1). If you find yourself copying the
+  shape of `KnowledgeSound`/`CTE`, stop — you almost certainly want to instantiate, not fork.
+- **One canonical step chain.** `ZkVM.step` is `ISA.System.step`. The committed step
+  `ISA.System.committedStep` and the bus step `Bus.System.stepWithBus` connect to it only through
+  theorems (`Bus.System.stepWithBus_committedOperation`, `ISA.System.committedOperation_step`,
+  `trace_mem_extract`). Do not introduce a parallel public binary "step" relation in a convenience
+  module.
 - **Anti-duplication protocol (Hicks trick):** before writing a new helper, search for an existing
   one (`Grep`, and read the docstrings in `Preliminaries/`/`Specification/`). If an agent produces a
   duplicate, the fix is: point it at the canonical definition, and have it add/extend a short
   `docs/reuse-notes.md` entry ("to do X, use `Y` in `Z.lean`"). That note then prevents recurrence.
-- **Compactness is a review target (I10):** the public defs + main theorems must not be materially
+- **Compactness is a review target (I6):** the public defs + main theorems must not be materially
   longer than the paper. Run `/simplify` (the reuse/simplification skill) on your diff before
   opening the PR and note what it changed.
 
-## 3. Reductions & idealization (I8, I9)
+## 3. Reductions & idealization (I5)
 
 - Stay in the **perfect / probability-free** model. Do not import VCVio. Do not add `λ`/`negl`/
   running-time.
@@ -78,23 +79,22 @@ layer.
 
 - **Branch per issue**, named `<issue-slug>` (e.g. `memory-twostep`, `recursion-multistep`),
   branched from `main`, PR'd back into `main`.
-- **The commitment binding layer is provisional** (I4): do not freeze binding notions.
-- Keep `lake build` green at the start and end of every session (I11). Commit messages are
-  imperative and cite the issue and any `CORRESPONDENCE.md` rows touched.
+- Keep `lake build` green at the start and end of every session (I7). Commit messages are
+  imperative and cite the issue.
 - Do not commit or push unless a human asks. Never skip hooks or bypass signing.
 
 ## 5. Skills to use (Claude Code)
 
 | Skill / command | When |
 |---|---|
-| `/simplify` | Before every PR — reuse/simplification/efficiency cleanup on the diff (enforces I5/I10). |
+| `/simplify` | Before every PR — reuse/simplification/efficiency cleanup on the diff (enforces I2/I6). |
 | `/code-review` | On your own working diff before requesting human review — catches bugs the reviewer shouldn't have to. |
 | `/security-review` | On any branch that touches a security *definition* or a reduction. |
 | [adversarial-review](adversarial-review.md) (see §6) | Session-end audit. |
 | `/init`, reuse-notes | When onboarding a new subsystem; keep `docs/reuse-notes.md` current. |
 
 Model guidance (Hicks + cost): use the strong interactive model for **definitions and theorem
-statements** (novel material — I3/I11); delegate proof-hole filling, mechanical refactors, and
+statements** (novel material — I1/I7); delegate proof-hole filling, mechanical refactors, and
 large-repo reading to cheaper models / background subagents, and have them **write their output to
 a file** for pickup.
 
@@ -106,17 +106,15 @@ must understand the notions). The standing checklist:
 1. **Definition audit (the 80%).** Read every *new public definition* and the *headline theorem
    statement*. Confirm the abstraction is the *right* one — e.g. "is this really update-binding?",
    "does this `CTE` instance quantify the trace the way the paper does?". This is the load-bearing
-   human act (I3). Approve the corresponding `CORRESPONDENCE.md` rows (fidelity **and**
-   completeness — beware "faithful but partial").
-2. **Non-vacuity (I6).** Confirm the theorem's hypotheses are satisfiable (model / instance /
+   human act (I1). Check fidelity **and** completeness — beware "faithful but partial".
+2. **Non-vacuity (I3).** Confirm the theorem's hypotheses are satisfiable (model / instance /
    counterexample witness present) and that no two assumptions jointly imply `False`. Ask an agent
    to *attempt* to derive `False` from the assumption bundle as a probe.
-3. **Surface & redundancy (I5/I10).** Confirm the new public surface is minimal and justified, and
-   that nothing duplicates a frozen/abstract notion.
-4. **Axioms (I7).** `#print axioms <headline>` shows only the permitted set; the repo-wide hygiene
+3. **Surface & redundancy (I2/I6).** Confirm the new public surface is minimal and justified, and
+   that nothing duplicates an abstract notion.
+4. **Axioms (I4).** `#print axioms <headline>` shows only the permitted set; the repo-wide hygiene
    gate reports no `sorry`, direct `sorryAx`, `admit`, `native_decide`, or new `axiom`.
-5. **Legibility.** Docstrings cite the paper; names match paper vocabulary; proofs comment *why* at
-   branch points.
+5. **Legibility.** Names match paper vocabulary; proofs comment *why* at branch points.
 
 Adversarial-review skill (session end, from `finality`): fan out independent skeptics along named
 dimensions — (a) soundness/vacuity, (b) kernel-truth re-verification (`#print axioms`, rebuild),
@@ -131,8 +129,7 @@ match the Lean, kept in lockstep (the precedent Dmitry set on the `memory-integr
 each new public definition or headline theorem, the companion states it in ordinary mathematical
 notation with the paper citation, so a reviewer can compare *paper ↔ companion ↔ Lean* without
 reading proof internals. A PR that adds Lean definitions without updating the companion is
-incomplete. The companion, `CORRESPONDENCE.md`, and the Lean must agree; discrepancies are review
-blockers.
+incomplete. The companion and the Lean must agree; discrepancies are review blockers.
 
 ## 8. Lessons
 

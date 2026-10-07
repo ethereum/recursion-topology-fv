@@ -126,7 +126,7 @@ example : system.toZkVM.verify ⟨fullState, fullState⟩ combineWitness := by
     CommittedMemory.step]
 
 example : system.toZkVM.step fullState fullState := by
-  simp [MultiStep.System.toZkVM, system, ISA.System.stepPlain,
+  simp [MultiStep.System.toZkVM, system, ISA.System.step,
     ISA.System.operation, isa, memFree, fullState]
 
 example : system.toZkVM.CTE :=

@@ -1,47 +1,55 @@
 import «recursion-topology-fv».VMs.Memory
 
 /-!
-# Representative Vanilla VM operation classes
+# An example Instruction Set Architecture (ISA) for a zkVM
 
-This module supplies the plain-state step predicate that later Vanilla VM
-instances use as `ZkVM.step`. It deliberately models five operation classes
-rather than the whitepaper's complete opcode list:
-`read`, `write`, `arith`, `hash`, and `bin`.
+An ISA says what one correct step of a zkVM is: run the instruction at the program counter, and change the VM state as
+that instruction specifies. This file defines that step as `System.step`. The VMs in this repo use it as `ZkVM.step`, so
+the trace that CTE extracts follows the program.
+
+## The ISA of this example VM
+
+A real ISA, such as RISC-V, has many instructions. This example VM groups them into five
+*operation classes*. For example, ADD and SUB are both part of the `arith` class.
+
+A step from `S₁ = (pc₁, regs₁, mem₁)` to `S₂ = (pc₂, regs₂, mem₂)` runs the instruction at `pc₁`,
+of class `op := code[pc₁]`. The step is valid when the PC/register requirements of `op` and the
+memory equation of `op` both hold:
+
+```text
+  class   meaning                        memory equation
+
+  read    read from memory               regs₂[1] = mem₁[regs₁[0]]  and  mem₂ = mem₁
+  write   write to memory                mem₂ = mem₁, except mem₂[regs₁[0]] = regs₁[1]
+  arith   arithmetic, such as ADD        mem₂ = mem₁
+  hash    Keccak or Poseidon hash call   mem₂ = mem₁
+  bin     binary/bitwise operation       mem₂ = mem₁
+```
+
+The PC/register requirements are `memFreePred op`. They are a parameter of `System`, so this
+file does not fix them. For example, the requirements of an ADD can say `pc₂ = pc₁ + 1` and
+`regs₂[2] = regs₁[0] + regs₁[1]`. They also see `pc₁`, so they can still tell an ADD from a SUB.
 
 ## Main definitions
-* `OperationClass` — the five representative operation classes.
-* `System` — the class of the instruction at each program counter, the
-  PC/register requirements left abstract by this issue, and the functions that
-  interpret register words as memory addresses and values.
-* `System.operation` — `φ_op`, including the class check and the operation's
-  explicit memory equation.
-* `System.stepPlain` — `φ_step`, the disjunction of the five operation
-  classes.
-* `System.committedOperation` — checks a particular `MemStep` against the
-  program and committed-memory equations.
-* `System.committedStep` — says that some `MemStep` passes those checks.
+* `OperationClass` — the five classes.
+* `System` — the ISA: `code`, the PC/register requirements, and the maps from register words to
+  memory addresses and values.
+* `System.operation` — the predicate of one class.
+* `System.step` — one of the five `operation` predicates holds.
+* `System.committedOperation` — like `System.step`, but memory is a commitment. A read or write
+  carries its opening proof in a `MemStep`.
+* `System.committedStep` — some `MemStep` passes `committedOperation`.
 
-## Main result
-* `System.stepPlain_iff_operation_at_pc` — a valid step is exactly the
-  operation selected by the program at the current program counter.
-* `System.committedOperation_stepPlain` — after memory reconstruction, an
-  accepted committed operation satisfies the single plain step predicate used
-  as `ZkVM.step`.
-
-The exact PC/register semantics remain abstract predicates, as they do in the
-paper. They may still distinguish the exact instruction at a program counter;
-only the five-way case split is simplified. Memory behavior is explicit: reads
-interpret register 0 as the address and register 1 of the second state as the
-loaded value; writes interpret registers 0 and 1 of the first state as the
-address and value; all other classes preserve memory.
-
-Paper: `eq:phiop`, `eq:phi-read-decomp`, and `eq:phi-write-decomp` (ch01), and
-the operation taxonomy and `eq:step` (ch03), deliberately simplified to the
-five classes.
+## Main results
+* `System.step_iff_operation_at_pc` — `System.step` holds exactly when the predicate of the
+  class `code[pc₁]` holds.
+* `System.committedOperation_step` — after memory reconstruction, a step that passes
+  `committedOperation` passes `System.step`.
 -/
 
 namespace VanillaZkVM
 namespace ISA
+
 
 /-! ## Operation classes and fixed ISA parameters -/
 
@@ -54,8 +62,7 @@ that must be checked by a hash chip. A value of this type identifies a class,
 not an exact decoded instruction. This is an intentional simplification, not a
 complete RV32IM opcode enumeration.
 
-Paper: operation taxonomy in ch03, with the deliberate five-operation
-simplification documented in `docs/CORRESPONDENCE.md`. -/
+Paper: operation taxonomy in ch03. -/
 inductive OperationClass where
   | read
   | write
@@ -64,42 +71,36 @@ inductive OperationClass where
   | bin
   deriving DecidableEq, Repr
 
-/-- The parameters that interpret the five operation classes. `Index` and `Value` are the memory
-types: the paper's `Addr → Byte`, or the types of a commitment scheme.
-
-Paper: `eq:phiop` and the `φ'_op` decomposition in ch01/ch03. -/
+/-- The parameters that interpret the five operation classes. Memory maps `Index` to `Value`: for
+example, addresses to bytes, or the index and value types of a commitment scheme. -/
 structure System (Index Value : Type) where
-  /-- The operation class of the instruction at each program counter. A class-level view of the
-  fixed program. -/
+  /-- The operation class of the instruction at each program counter. -/
   code : Word → OperationClass
-  /-- The PC/register requirements `φ'_op` for each operation class. It can use the program
+  /-- The PC/register requirements for each operation class. It can use the program
   counter to tell instructions in a class apart. For read and write, it must also enforce the
   address bounds. `operation` adds the class check and the memory equation. -/
   memFreePred : OperationClass → MemFreePredicate
-  /-- Interpret the address register as an index in this system's memory. Identity for the
-  paper's `ℕ`-based types. -/
+  /-- Interpret the address register as an index in this system's memory. The identity when
+  `Index` is `ℕ`. -/
   indexOfWord : Word → Index
-  /-- Interpret a register word as a value in this system's memory. Identity for the paper's
-  `ℕ`-based types. -/
+  /-- Interpret a register word as a value in this system's memory. The identity when `Value` is
+  `ℕ`. -/
   valueOfWord : Word → Value
 
 namespace System
 
 variable {Index Value : Type} (isa : System Index Value)
 
-/-! ## Full operation predicates and the single plain step -/
+/-! ## Full operation predicates and the step predicate -/
 
-/-- The full predicate `φ_op` for one operation class.
+/-- The full predicate for one operation class.
 
 Every case checks that `code S₁.pc = op`. The read and write cases reuse
-`FullMemory.read` and `FullMemory.write`, selecting their address/value
-arguments from the registers prescribed by the paper. The remaining cases
-combine their PC/register requirements with `S₂.mem = S₁.mem`.
+`FullMemory.read` and `FullMemory.write`. Register 0 of `S₁` holds the address.
+Register 1 holds the value of `S₂` for a read, and of `S₁` for a write. The
+remaining cases combine their PC/register requirements with `S₂.mem = S₁.mem`.
 
-The read case therefore includes `S₂.mem = S₁.mem`.
-
-Paper: `eq:phiop`, `eq:phi-read-decomp`, `eq:phi-write-decomp` (ch01), and the
-non-memory-operation equation immediately before `eq:step` (ch03) in `docs/vanillaVM.pdf`. -/
+The read case also includes `S₂.mem = S₁.mem`. -/
 def operation (op : OperationClass) (S₁ S₂ : VMStateWith (Index → Value)) : Prop :=
   isa.code S₁.pc = op ∧
     match op with
@@ -116,32 +117,29 @@ def operation (op : OperationClass) (S₁ S₂ : VMStateWith (Index → Value)) 
     | .bin =>
         isa.memFreePred .bin S₁.pc S₁.regs S₂.pc S₂.regs ∧ S₂.mem = S₁.mem
 
-/-- The plain-state step predicate `φ_step` used as `ZkVM.step`. It holds when
+/-- The step predicate used as `ZkVM.step`. It holds when
 one of the five operation-class predicates holds. Each clause checks that the
 class matches the instruction at the current program counter.
 
-Concrete Vanilla VM constructions must use this predicate as their
-`ZkVM.step`; it is not an additional step relation beside `ZkVM.step`.
-
-Paper: `eq:step` (ch03), with the deliberate five-operation simplification
-documented in `docs/CORRESPONDENCE.md`. -/
-def stepPlain (S₁ S₂ : VMStateWith (Index → Value)) : Prop :=
+The VMs in this repo must use this predicate as their `ZkVM.step`; it is not an
+additional step relation beside `ZkVM.step`. -/
+def step (S₁ S₂ : VMStateWith (Index → Value)) : Prop :=
   isa.operation .read S₁ S₂ ∨
   isa.operation .write S₁ S₂ ∨
   isa.operation .arith S₁ S₂ ∨
   isa.operation .hash S₁ S₂ ∨
   isa.operation .bin S₁ S₂
 
-/-- A plain step executes exactly the operation class stored in the program at
-the current program counter. Thus the disjunction in `stepPlain` does not let a
+/-- A step executes exactly the operation class stored in the program at
+the current program counter. Thus the disjunction in `step` does not let a
 proof choose an unrelated operation: the condition `code S₁.pc = op` in
 `operation` fixes the only possible branch.
 
 Paper: instruction selection in `eq:op` and `eq:phiop` (ch01), and the
 disjunctive step predicate `eq:step` (ch03). -/
-theorem stepPlain_iff_operation_at_pc (S₁ S₂ : VMStateWith (Index → Value)) :
-    isa.stepPlain S₁ S₂ ↔ isa.operation (isa.code S₁.pc) S₁ S₂ := by
-  cases hcode : isa.code S₁.pc <;> simp [stepPlain, operation, hcode]
+theorem step_iff_operation_at_pc (S₁ S₂ : VMStateWith (Index → Value)) :
+    isa.step S₁ S₂ ↔ isa.operation (isa.code S₁.pc) S₁ S₂ := by
+  cases hcode : isa.code S₁.pc <;> simp [step, operation, hcode]
 
 /-! ## Connection to committed-memory execution -/
 
@@ -201,7 +199,7 @@ def committedStep {VC : VectorCommitment}
 
 /-- Suppose a committed operation is accepted and memory reconstruction checks
 the same `MemStep` between the corresponding full states. Then those full
-states satisfy `stepPlain`. `CommitInv` supplies the fact that each committed
+states satisfy `step`. `CommitInv` supplies the fact that each committed
 state has the same program counter and registers as its full state.
 
 `TwoStep.System.traceValid_full` uses this theorem to keep opening proofs inside
@@ -210,14 +208,14 @@ execution predicate.
 
 Paper: the committed/full operation correspondence used in
 `prop:memory-extractability` and Step 6 of `thm:main` (ch05). -/
-theorem committedOperation_stepPlain {VC : VectorCommitment}
+theorem committedOperation_step {VC : VectorCommitment}
     (isa : System VC.Index VC.Value)
     (S₁ S₂ : FullVMState VC) (Ŝ₁ Ŝ₂ : CommittedVMState VC) (w : MemStep VC)
     (hInv₁ : CommitInv Ŝ₁ S₁) (hInv₂ : CommitInv Ŝ₂ S₂)
     (hcommitted : isa.committedOperation Ŝ₁ Ŝ₂ w)
     (hfull : FullMemory.step isa.selectedMemFreePred S₁ S₂ w) :
-    isa.stepPlain S₁ S₂ := by
-  rw [isa.stepPlain_iff_operation_at_pc]
+    isa.step S₁ S₂ := by
+  rw [isa.step_iff_operation_at_pc]
   obtain ⟨hpc₁, hregs₁, _⟩ := hInv₁
   obtain ⟨_, hregs₂, _⟩ := hInv₂
   obtain ⟨_, hmatches⟩ := hcommitted

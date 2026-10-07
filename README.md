@@ -49,7 +49,7 @@ In v1 our extractor is a plain function, with no probabilities or running times.
 
 - `recursion-topology-fv/Preliminaries/`: Generic cryptography, definitions only (argument systems, commitments, traces)
 - `recursion-topology-fv/Specification/`: What a zkVM is and what it must prove (CTE)
-- `recursion-topology-fv/VMs/*.lean`: Shared VM building blocks (state, memory, ISA, bus, step contract)
+- `recursion-topology-fv/VMs/*.lean`: Shared VM building blocks (state, memory, ISA, bus)
 - `recursion-topology-fv/VMs/NonDeterministic/`: Generic wrapper that adds private input to any zkVM
 
 **Integrated VMs.**

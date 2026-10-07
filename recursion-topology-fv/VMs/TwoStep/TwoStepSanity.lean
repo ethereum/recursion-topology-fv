@@ -94,7 +94,7 @@ example : system.toZkVM.verify ⟨fullState, fullState⟩ finalWitness := by
     CommittedMemory.step]
 
 example : system.toZkVM.step fullState fullState := by
-  simp [TwoStep.System.toZkVM, system, ISA.System.stepPlain,
+  simp [TwoStep.System.toZkVM, system, ISA.System.step,
     ISA.System.operation, isa, memFree, fullState]
 
 example : system.toZkVM.CTE := by

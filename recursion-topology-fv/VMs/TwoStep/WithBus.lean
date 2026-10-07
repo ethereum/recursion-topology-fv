@@ -20,8 +20,6 @@ memory.
   with the bus-backed segment verifier.
 
 ## Main results
-* `TwoStepSystem.busBridge` — turns the reusable bus implication into the
-  `StepInterface.BusBridge` statement required by this VM.
 * `TwoStepSystem.execution_extract` — extracts every segment, retains its own
   bus, and concatenates the state traces.
 * `TwoStepSystem.cte` — memory reconstruction turns the concatenated committed
@@ -90,19 +88,6 @@ structure Assumptions (sys : TwoStepSystem) : Prop where
   memory. -/
   updateBinding : sys.segment.VC.UpdateBinding
 
-/-- State the reusable bus result in the form required by this concrete VM.
-`stepWithBus_committedOperation` retains a particular memory witness; this
-theorem supplies that same value to prove that a suitable witness exists.
-
-Paper: the implication from `eq:step-bus2` to the committed step used by
-`lem:segment` and `prop:memory-extractability`. -/
-theorem busBridge :
-    sys.toTwoStep.memoryStepInterface.BusBridge sys.segment.stepWithBus := by
-  intro Ŝ₁ Ŝ₂ aux hstep
-  change sys.segment.isa.committedStep Ŝ₁ Ŝ₂
-  exact ⟨aux.memory,
-    sys.segment.stepWithBus_committedOperation Ŝ₁ Ŝ₂ aux hstep⟩
-
 /-! ## Applying the segment theorem across one complete execution -/
 
 /-- What we recover from a complete non-recursive proof.
@@ -157,8 +142,8 @@ accepted segment proof, and join the resulting state traces with
 `chain_flatten`.
 
 The returned value retains every segment's own bus and `MemStep` values. State
-concatenation occurs only after `busBridge` has proved that each bus-checked
-transition satisfies the existing committed ISA relation.
+concatenation occurs only after `stepWithBus_committedOperation` has proved that
+each bus-checked transition satisfies the existing committed ISA relation.
 This theorem uses the segment and final-proof fields of `Assumptions`; the
 memory fields in the same structure are used later by `cte`.
 
@@ -194,8 +179,8 @@ theorem execution_extract (hNseg : 0 < sys.segment.Nseg) (h : sys.Assumptions) :
       sys.segment.isa.committedStep (segments i |>.states j)
         (segments i |>.states (j + 1)) := by
     intro i hi j hj
-    exact sys.busBridge _ _ ⟨(segments i).bus, (segments i).steps j⟩
-      ((hsegmentValid i hi).2.2 j hj)
+    exact ⟨_, sys.segment.stepWithBus_committedOperation _ _
+      ⟨(segments i).bus, (segments i).steps j⟩ ((hsegmentValid i hi).2.2 j hj)⟩
   obtain ⟨htraceStart, htraceEnd, htraceStep⟩ :=
     chain_flatten sys.segment.isa.committedStep sys.segment.Nseg sys.m
       hNseg finalWitness.boundary (fun i => (segments i).states)
@@ -212,7 +197,7 @@ theorem execution_extract (hNseg : 0 < sys.segment.Nseg) (h : sys.Assumptions) :
 
 /-- The full-memory two-layer zkVM whose segment verifier is backed by the
 reusable bus system. Its state and step predicate remain `FullVMState` and
-`ISA.System.stepPlain`.
+`ISA.System.step`.
 
 Paper: the non-recursive two-layer specialization of `def:zkvm`. -/
 def toZkVM : ZkVM := sys.toTwoStep.toZkVM
@@ -221,7 +206,7 @@ def toZkVM : ZkVM := sys.toTwoStep.toZkVM
 
 `execution_extract` supplies a committed execution while preserving the bus
 evidence for each segment. The existing memory theorem then reconstructs a
-full-memory trace satisfying `ISA.System.stepPlain`.
+full-memory trace satisfying `ISA.System.step`.
 
 This is not the complete recursive VanillaVM theorem. Its purpose is to show
 that the reusable segment result can be used in an actual `ZkVM`; the assembled

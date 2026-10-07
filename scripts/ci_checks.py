@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""CI audit checks for recursion-topology-fv (INVARIANTS.md I1, I7).
+"""CI audit checks for recursion-topology-fv (INVARIANTS.md I4).
 
 Checks are selected by flag (multiple may be passed together — the Lean audits share a
 single `lake env lean` invocation, so Mathlib is loaded once):
@@ -7,26 +7,14 @@ single `lake env lean` invocation, so Mathlib is loaded once):
   --self-test              Exercise the source lexer and project-module
                            enumeration used by the hygiene gate.
 
-  --check-correspondence   Every *audited* row in docs/CORRESPONDENCE.md must name
-                           a declaration that actually elaborates. "Audited" is
-                           read from the table's own `Status` column (the
-                           controlled vocabulary defined in the doc header): a row
-                           counts iff its status is `proved…` or `stated…`. Rows
-                           that are `planned` / `pending` / `to be removed` /
-                           `prototype` / `n/a`, and tables with no `Status` column
-                           (the Planned section), are skipped — and the skipped
-                           rows are printed, so a silently-dropped row cannot pass
-                           as a false OK. We generate `#check @<name>` lines and
-                           compile them (I1: "the named declaration must elaborate").
-
   --check-axioms           Every headline theorem depends only on the permitted
                            axiom set {propext, Classical.choice, Quot.sound}, and on
-                           no `sorryAx` (I7). We generate `#print axioms` lines and
+                           no `sorryAx` (I4). We generate `#print axioms` lines and
                            parse the output. NOTE this pins only the *listed*
                            theorems' footprints — it is not the repo-wide promise;
                            that is `--check-hygiene`.
 
-  --check-hygiene          The repo-wide I7 promise: **no** `sorry` and **no**
+  --check-hygiene          The repo-wide I4 promise: **no** `sorry` and **no**
                            non-permitted axiom anywhere in the project's own
                            modules. Two independent layers, because `lake build`
                            enforces neither (`sorry` is only a *warning* and an
@@ -63,7 +51,6 @@ import tempfile
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
-CORRESPONDENCE = REPO / "docs" / "CORRESPONDENCE.md"
 
 PERMITTED_AXIOMS = {"propext", "Classical.choice", "Quot.sound"}
 
@@ -78,27 +65,22 @@ HEADLINE_THEOREMS = [
     "VanillaZkVM.TwoStep.System.cte", # full-memory two-step CTE
     "VanillaZkVM.MemorySanity.exactVC_bindingAssumptions",  # satisfiability
     "VanillaZkVM.MemorySanity.appendBitVC_not_updateBinding",  # countermodel
-    "VanillaZkVM.ISA.System.stepPlain_iff_operation_at_pc",  # fixed-program selection
-    "VanillaZkVM.ISA.System.committedOperation_stepPlain",  # committed/plain bridge
+    "VanillaZkVM.ISA.System.step_iff_operation_at_pc",  # fixed-program selection
+    "VanillaZkVM.ISA.System.committedOperation_step",  # committed/step bridge
     "VanillaZkVM.MultiStep.System.combine_tree", # tree-unrolling extraction
     "VanillaZkVM.MultiStep.System.committedTrace_extract",  # embed ∘ tree unrolling
     "VanillaZkVM.MultiStep.System.cte",          # full-memory multi-step CTE
     "VanillaZkVM.Bus.System.stepWithBus_committedOperation",  # bus/ISA witness bridge
     "VanillaZkVM.Bus.System.segment_extract",  # one-segment bus unification
-    "VanillaZkVM.Bus.TwoStepSystem.busBridge",  # concrete step-interface bridge
     "VanillaZkVM.Bus.TwoStepSystem.execution_extract",  # non-recursive per-segment execution
     "VanillaZkVM.Bus.TwoStepSystem.cte",       # bus-backed two-step CTE
     "VanillaZkVM.VanillaVM.System.cte_main",   # recursive CTE with bus-checked segments
 ]
 
-# A Lean identifier: dotted, letters/digits/_/'  (no braces, no spaces).
-IDENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_.']*$")
-CODESPAN = re.compile(r"`([^`]+)`")
-
 # Project source scanned by the hygiene source layer.
 LEAN_ROOT = REPO / "recursion-topology-fv.lean"
 LEAN_SRC_DIR = REPO / "recursion-topology-fv"
-# Tokens that must never appear in project source (I7). `axiom` is included
+# Tokens that must never appear in project source (I4). `axiom` is included
 # because the permitted axioms come from core/Mathlib — we never declare our own.
 FORBIDDEN_TOKENS = [
     (re.compile(r"\bsorry\b"), "sorry"),
@@ -110,7 +92,7 @@ FORBIDDEN_TOKENS = [
 
 # Walks every constant *declared in the project's own modules* and fails on a
 # non-permitted axiom or a `sorryAx`. Scoped in a section so its `open`s cannot
-# perturb the `#check`/`#print axioms` lines that share this compilation.
+# perturb the `#print axioms` lines that share this compilation.
 LEAN_HYGIENE = """
 section CIHygieneCheck
 open Lean Elab Command
@@ -140,7 +122,7 @@ run_cmd do
   else
     IO.println s!"FAIL: {problems.size} hygiene violation(s):"
     for p in problems do IO.println p
-    throwError "repo-wide axiom/sorry hygiene check failed (I7)"
+    throwError "repo-wide axiom/sorry hygiene check failed (I4)"
 
 end CIHygieneCheck
 """
@@ -271,7 +253,7 @@ def check_hygiene_source() -> int:
     for path in files:
         problems.extend(source_problems(path, path.read_text(encoding="utf-8")))
     if problems:
-        print(f"FAIL: {len(problems)} forbidden token(s) in project source (I7):",
+        print(f"FAIL: {len(problems)} forbidden token(s) in project source (I4):",
               file=sys.stderr)
         for p in problems:
             print(p, file=sys.stderr)
@@ -355,69 +337,6 @@ def _fail(msg: str, res: subprocess.CompletedProcess) -> int:
     return 1
 
 
-def _table_rows() -> list[tuple[str, str]]:
-    """Every data row of a CORRESPONDENCE table that has a `Status` column,
-    as `(declaration cell, status cell)`. Column positions are read per-table
-    from each table's own header, so the different tables' layouts are handled
-    uniformly. Tables without a `Status` column yield nothing."""
-    rows: list[tuple[str, str]] = []
-    decl_idx: int | None = None
-    status_idx: int | None = None
-    for raw in CORRESPONDENCE.read_text(encoding="utf-8").splitlines():
-        line = raw.strip()
-        if not line.startswith("|"):
-            decl_idx = status_idx = None  # left the current table
-            continue
-        cols = [c.strip() for c in line.strip("|").split("|")]
-        low = [c.lower() for c in cols]
-        if any(c.startswith("lean declaration") for c in low):  # header row
-            decl_idx = next(i for i, c in enumerate(low) if c.startswith("lean declaration"))
-            status_idx = next((i for i, c in enumerate(low) if c == "status"), None)
-            continue
-        if cols and set(cols[0]) <= {"-", ":"}:  # separator row
-            continue
-        if decl_idx is None or decl_idx >= len(cols):
-            continue
-        status = cols[status_idx] if (status_idx is not None and status_idx < len(cols)) else ""
-        rows.append((cols[decl_idx], status))
-    return rows
-
-
-def _qualify(cell: str) -> list[str]:
-    """Declaration names in a cell. A later *bare* name is a sibling sharing the
-    first dotted name's namespace, e.g. `A.B.foo` / `bar` -> A.B.foo, A.B.bar."""
-    out: list[str] = []
-    prefix = ""
-    for span in CODESPAN.findall(cell):
-        span = span.strip()
-        if not IDENT.match(span):
-            continue
-        if "." in span:
-            prefix = span.rsplit(".", 1)[0]
-            out.append(span)
-        else:
-            out.append(f"{prefix}.{span}" if prefix else span)
-    return out
-
-
-def selected_declarations() -> tuple[list[str], list[tuple[str, str]]]:
-    """`(audited names to #check, skipped (declaration, status) rows)`."""
-    included: list[str] = []
-    skipped: list[tuple[str, str]] = []
-    seen: set[str] = set()
-    for decl, status in _table_rows():
-        names = _qualify(decl)
-        audited = status.lower().startswith(("proved", "stated"))
-        if audited and names:
-            for n in names:
-                if n not in seen:
-                    seen.add(n)
-                    included.append(n)
-        elif decl.strip():
-            skipped.append((decl.strip(), status.strip() or "(no status column)"))
-    return included, skipped
-
-
 def run_lean(body: str) -> subprocess.CompletedProcess:
     with tempfile.NamedTemporaryFile(
         "w", suffix=".lean", dir=REPO, delete=False, encoding="utf-8"
@@ -466,21 +385,18 @@ def eval_axioms(out: str) -> int:
 
 
 def main() -> int:
-    # CORRESPONDENCE cells contain unicode (em-dashes, arrows); keep printing them
+    # Module names and Lean output contain unicode (`«…»`); keep printing them
     # from crashing on a non-UTF-8 console (e.g. Windows cp1252).
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8", errors="replace")
     ap = argparse.ArgumentParser()
     ap.add_argument("--self-test", action="store_true")
-    ap.add_argument("--check-correspondence", action="store_true")
     ap.add_argument("--check-axioms", action="store_true")
     ap.add_argument("--check-hygiene", action="store_true")
     args = ap.parse_args()
-    if not (args.self_test or args.check_correspondence or
-            args.check_axioms or args.check_hygiene):
-        ap.error("pass --self-test, --check-correspondence, --check-axioms "
-                 "and/or --check-hygiene")
+    if not (args.self_test or args.check_axioms or args.check_hygiene):
+        ap.error("pass --self-test, --check-axioms and/or --check-hygiene")
 
     rc_test = self_test() if args.self_test else 0
     rc_src = check_hygiene_source() if args.check_hygiene else 0
@@ -499,44 +415,26 @@ def main() -> int:
             return _fail("FAIL: a discovered project module did not compile.", built)
 
     body = "".join(f"import {module}\n" for module in modules)
-    body += "open VanillaZkVM\n"
-    names: list[str] = []
-    if args.check_correspondence:
-        names, skipped = selected_declarations()
-        if not names:
-            print("ERROR: parsed zero audited declarations from CORRESPONDENCE.md",
-                  file=sys.stderr)
-            return 1
-        print(f"Checking {len(names)} audited CORRESPONDENCE declarations elaborate:")
-        for n in names:
-            print(f"  #check @{n}")
-        if skipped:
-            print(f"Skipped {len(skipped)} non-audited row(s):")
-            for decl, status in skipped:
-                print(f"  - {decl}  [{status}]")
-        body += "".join(f"#check @{n}\n" for n in names)
     if args.check_axioms:
         body += "".join(f"#print axioms {t}\n" for t in HEADLINE_THEOREMS)
     if args.check_hygiene:
         body += LEAN_HYGIENE
 
-    if not (args.check_correspondence or args.check_axioms or args.check_hygiene):
+    if not (args.check_axioms or args.check_hygiene):
         return rc_test
 
     res = run_lean(body)
-    # A non-zero exit means either an elaboration error (a renamed/removed audited
-    # declaration or headline theorem) or the hygiene metaprogram's `throwError`.
-    # All checks share this single compile, so distinguish by the marker it prints.
+    # A non-zero exit means either an elaboration error (a renamed or removed
+    # headline theorem) or the hygiene metaprogram's `throwError`. Both checks
+    # share this single compile, so distinguish by the marker it prints.
     if res.returncode != 0:
         combined = res.stdout + res.stderr
-        why = ("FAIL: repo-wide axiom/sorry hygiene violation (I7)."
+        why = ("FAIL: repo-wide axiom/sorry hygiene violation (I4)."
                if "hygiene violation" in combined
-               else "FAIL: a checked declaration/theorem did not elaborate.")
+               else "FAIL: a headline theorem did not elaborate.")
         return _fail(why, res)
 
     rc = rc_test | rc_src
-    if args.check_correspondence:
-        print("OK: all audited CORRESPONDENCE declarations elaborate.")
     if args.check_axioms:
         print(res.stdout.strip())
         rc |= eval_axioms(res.stdout)

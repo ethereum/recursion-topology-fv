@@ -1,26 +1,14 @@
 import «recursion-topology-fv».Preliminaries.VectorCommitment
 
 /-!
-# VM states (Execution Model — Chapter 1)
+# VM state
 
 The state vocabulary shared by every concrete VM: machine words, byte-addressed
 memory, and the Lean structure that groups a program counter, registers, and
 memory into one VM state.
 
-These belong to the *VMs*, not to the specification: the abstract `ZkVM` in
-`Specification/Zkvm.lean` is parameterized by an opaque `State` type and never
-mentions them. Keeping the state vocabulary here is what leaves `Specification/`
-free of any dependency on the commitment layer.
-
-## Main definitions
-* `Word` — the machine word type (abstracted as `ℕ` for now).
-* `VMStateWith` — the structure containing `pc`, `regs`, and `mem`, with the
-  type of `mem` supplied as a parameter.
-* `CommittedVMState` — the committed state `Ŝ = (pc, regs, mem̂)`.
-
 The commitment-native full state `FullVMState` and the representation relation
-`CommitInv` tying the two together live in `Memory.lean`, beside the
-reconstruction argument that uses them.
+`CommitInv` tying the two together live in `Memory.lean`.
 -/
 
 namespace VanillaZkVM

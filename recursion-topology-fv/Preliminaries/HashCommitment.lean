@@ -10,9 +10,7 @@ vector-commitment binding notions, while the bus consumes only collision-resista
 The notion is idealized as plain injectivity. See `IDEALIZATION.md`.
 
 `VMs/Bus.lean` consumes these declarations to identify the four buses extracted
-inside one segment. A concrete VM can then use the resulting committed-step
-theorem to prove its `StepInterface.BusBridge`; the two-layer VM does so in
-`VMs/TwoStep/WithBus.lean`. No theorem compares buses from different segments.
+inside one segment. No theorem compares buses from different segments.
 -/
 
 namespace VanillaZkVM

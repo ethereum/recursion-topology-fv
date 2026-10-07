@@ -11,8 +11,6 @@ import «recursion-topology-fv».Specification.Cte                   -- R*, CTE,
 
 -- VMs: concrete machinery and instances.
 import «recursion-topology-fv».VMs.State                           -- Word/Addr/Byte, VM state, committed VM state
-import «recursion-topology-fv».VMs.Step                            -- canonical plain/committed/bus step-interface contract
-import «recursion-topology-fv».VMs.StepSanity                      -- accepting one-step non-vacuity model (private examples)
 import «recursion-topology-fv».VMs.Memory                          -- committed/full-memory step lift and trace reconstruction
 import «recursion-topology-fv».VMs.MemorySanity                    -- satisfiable binding model and append-bit countermodel
 import «recursion-topology-fv».VMs.ISA                             -- representative five-class plain ISA
@@ -40,8 +38,8 @@ list; there are no back-edges.
   generic trace-concatenation helper.
 * `Specification/` — what a zkVM is and what it must prove:
   `ZkVM`, `TraceValid`, `Rstar`, `CTE`, `cte_iff_knowledgeSound`.
-* `VMs/` — concrete VM machinery: state vocabulary, the step-interface contract,
-  committed-memory reconstruction, the representative ISA, the per-segment bus,
+* `VMs/` — concrete VM machinery: state vocabulary, committed-memory
+  reconstruction, the representative ISA, the per-segment bus,
   the two-step variants, the multi-step recursion tower, the final recursive VM
   with bus-checked segments that instantiate the specification, and the
   private-input wrapper that turns any of them into a non-deterministic VM.

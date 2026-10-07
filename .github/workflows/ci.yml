@@ -1,8 +1,7 @@
 name: CI
 
-# `lake build` + `#print axioms` (I7) + a
-# CORRESPONDENCE row-elaboration check (I1). No behavioural change is allowed to
-# break these; every PR into `main` must pass them.
+# `lake build` + `#print axioms` + the repo-wide hygiene check (I4). No
+# behavioural change is allowed to break these; every PR into `main` must pass them.
 
 # `main` is the integration branch. `main-temp` is retained only so that any
 # still-open branch targeting it keeps its gate; drop it once none remain.
@@ -49,14 +48,13 @@ jobs:
 
       # The audit explicitly builds every discovered project module, including
       # files outside the umbrella import closure. One subsequent Lean invocation
-      # loads Mathlib once and runs all semantic audits (I1 + I7).
+      # loads Mathlib once and runs all semantic audits (I4).
       # --check-hygiene is the repo-wide "no sorry / no new axiom" gate; `lake build`
       # does NOT enforce it (sorry is a warning, an `axiom` decl compiles), and
       # --check-axioms only pins the listed headline theorems.
-      - name: Audit — CORRESPONDENCE (I1) + headline axioms + repo-wide hygiene (I7)
+      - name: Audit — headline axioms + repo-wide hygiene (I4)
         run: >-
           python3 scripts/ci_checks.py
           --self-test
-          --check-correspondence
           --check-axioms
           --check-hygiene

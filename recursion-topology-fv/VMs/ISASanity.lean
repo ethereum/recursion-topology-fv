@@ -8,7 +8,7 @@ These private examples demonstrate both accepted and rejected steps. They cover
 an accepted read, an accepted write whose output memory differs from its input,
 rejection when the program contains a different operation class, and rejection
 when a write produces the wrong memory. A private `ZkVM` instance also checks
-that `ISA.System.stepPlain` can be used directly as its `step` field.
+that `ISA.System.step` can be used directly as its `step` field.
 
 Nothing in this file adds to the public API or asserts concrete cryptographic
 security.
@@ -35,8 +35,8 @@ private def zeroState : VMState :=
   ⟨0, fun _ => 0, fun _ => 0⟩
 
 private theorem accepts_read :
-    (systemFor .read).stepPlain zeroState zeroState := by
-  simp [ISA.System.stepPlain, ISA.System.operation, systemFor,
+    (systemFor .read).step zeroState zeroState := by
+  simp [ISA.System.step, ISA.System.operation, systemFor,
     FullMemory.read, zeroState]
 
 private def writeRegisters (i : ℕ) : Word :=
@@ -52,8 +52,8 @@ private def afterWrite : VMState :=
   ⟨0, writeRegisters, writeMemory⟩
 
 private theorem accepts_changed_write :
-    (systemFor .write).stepPlain beforeWrite afterWrite := by
-  simp [ISA.System.stepPlain, ISA.System.operation, systemFor,
+    (systemFor .write).step beforeWrite afterWrite := by
+  simp [ISA.System.step, ISA.System.operation, systemFor,
     FullMemory.write, beforeWrite, afterWrite, writeRegisters, writeMemory]
 
 private theorem rejects_wrong_fetch :
@@ -67,16 +67,16 @@ private theorem rejects_incorrect_write_result :
 
 private def readZkVM : ZkVM where
   State := VMState
-  step := (systemFor .read).stepPlain
+  step := (systemFor .read).step
   T := 1
   Stmt := VMState × VMState
   PrivInput := Unit
   initial := fun x _ => x.1
   terminal := fun x _ => x.2
   Proof := Unit
-  verify := fun x _ => (systemFor .read).stepPlain x.1 x.2
+  verify := fun x _ => (systemFor .read).step x.1 x.2
 
-private theorem concrete_zkVM_uses_stepPlain :
+private theorem concrete_zkVM_uses_step :
     readZkVM.step zeroState zeroState :=
   accepts_read
 

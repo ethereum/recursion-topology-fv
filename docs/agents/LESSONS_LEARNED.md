@@ -16,18 +16,12 @@ guard; when a guard becomes a CI check, note that.
   type error is often a variable Lean would have auto-bound elsewhere. Declare it.
   **Guard:** `autoImplicit = false` in `lakefile.toml`; do not silence the linter locally.
 
-## Definitions / abstraction (the load-bearing 80%, I3)
-
-- **Do not over-freeze.** The commitment/binding layer is deliberately *provisional*:
-  `PuncturedBinding` is insufficient and is replaced by `UpdateBinding`.
-  Freezing it now would force a constitutional amendment to fix a known-wrong def.
-  Only the I4 kernel list is frozen.
-  **Guard:** INVARIANTS.md I4; provisional docstrings in `Preliminaries/VectorCommitment.lean`.
+## Definitions / abstraction (the load-bearing 80%, I1)
 
 - **"Faithful but partial" is a distinct failure mode.** A Lean statement can mean the
-  paper statement yet cover only a fragment of it. Fidelity and completeness are
-  separate reviewer columns for a reason.
-  **Guard:** CORRESPONDENCE.md `Fidelity` **and** `Complete` columns; CONVENTIONS.md §6.1.
+  paper statement yet cover only a fragment of it. Review fidelity and completeness
+  separately.
+  **Guard:** CONVENTIONS.md §6.1.
 
 - **"Needed for this reduction" does not mean logical implication.** The paper
   defines position binding and update binding as independent properties.
@@ -46,7 +40,7 @@ guard; when a guard becomes a CI check, note that.
   generic term “descriptor” is neither a Lean declaration nor paper vocabulary.
   **Guard:** `ISA.System.committedOperation` performs the concrete
   `MemStep`/register/program wiring, and `TwoStep.System.toZkVM.step` is
-  `ISA.System.stepPlain`; review rejects either a disconnected step predicate
+  `ISA.System.step`; review rejects either a disconnected step predicate
   or generic synonyms for formal witness types.
 
 - **A two-endpoint refinement is not an inductive reconstruction theorem.**
@@ -59,8 +53,8 @@ guard; when a guard becomes a CI check, note that.
 
 - **Agents anchor on training-data analogues for novel-but-familiar notions.** A
   definition that "looks like" a standard one may be silently bent toward the textbook
-  version. Novel material (I3) is written interactively or with heavy up-front docs.
-  **Guard:** INVARIANTS.md I11; human definition audit (CONVENTIONS.md §6.1).
+  version. Novel material (I1) is written interactively or with heavy up-front docs.
+  **Guard:** INVARIANTS.md I7; human definition audit (CONVENTIONS.md §6.1).
 
 ## Naming / documentation
 
@@ -83,24 +77,20 @@ guard; when a guard becomes a CI check, note that.
 
 - **A rename's risk lives in the docs, not the Lean.** `lake build` fully verifies the
   code side of a pure rename; drift lands in prose. Update living docs
-  (CORRESPONDENCE.md, math-companion.md). Footgun: in a
-  CORRESPONDENCE.md name cell, a bare name inherits the namespace of the *previous*
-  dotted name, so rows mixing namespaces must fully qualify every name.
-  **Guard:** `ci_checks.py --check-correspondence` elaborates every audited row
-  (caught the `committedStep` mis-prefix live); repo-wide grep for the old name
-  before declaring a rename done.
+  (math-companion.md).
+  **Guard:** repo-wide grep for the old name before declaring a rename done.
 
 ## Vacuity / axioms
 
-- **A theorem with unsatisfiable hypotheses is a bug (I6).** Every headline theorem
+- **A theorem with unsatisfiable hypotheses is a bug (I3).** Every headline theorem
   needs a model / instance / counterexample witness (cf. `knowledgeSound_trivialAS`,
   pr5's `appendBitVC_not_updateBinding`).
-  **Guard:** vacuity probe in the adversarial-review skill; INVARIANTS.md I6.
+  **Guard:** vacuity probe in the adversarial-review skill; INVARIANTS.md I3.
 
 - **Axiom set is fixed at `{propext, Classical.choice, Quot.sound}`.** No `native_decide`,
   no new `axiom`, no untracked `sorry`.
   **Guard:** headline `#print axioms` plus the repo-wide source/module hygiene gate in CI
-  (INVARIANTS.md I7).
+  (INVARIANTS.md I4).
 
 - **The default Lake target is not the whole source tree.** A new `.lean` file that is not
   imported by `recursion-topology-fv.lean` is ignored by bare `lake build`; the umbrella file itself is

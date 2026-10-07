@@ -27,15 +27,6 @@ reconstruction would have no state to produce.
   lemmas by induction along a whole committed trace (with
   `stepReconstruct`/`reconstructTrace`/`chooseMemStep`).
 
-In the perfect/probability-free style of `Preliminaries/`, "except with
-probability `Adv`" collapses to "always", so the two binding hypotheses are
-consumed as plain implications.
-
-This file mentions `StepInterface` (from `Step.lean`) only in prose and
-deliberately does not import it: memory reconstruction is stated over raw states
-and knows nothing of SNARKs or the abstract `ZkVM`. `VMs/TwoStep/TwoStep.lean` is
-where these results are packaged through that interface.
-
 Paper: `prop:memory-extractability` (ch05 §5.2); `φ̂_read`/`φ̂_write` (ch03).
 -/
 

@@ -95,7 +95,7 @@ def toMultiStep : MultiStep.System where
   embedVerify := sys.embedVerify
 
 /-- The full-memory zkVM obtained from the assembled bus and recursion system.
-Its step predicate is the representative ISA's `stepPlain`, and its verifier
+Its step predicate is `ISA.System.step`, and its verifier
 commits the claimed initial and final memories before running the embed
 verifier.
 

@@ -248,7 +248,7 @@ private theorem accepts_final_proof :
 private theorem accepts_plain_step :
     system.toZkVM.step fullState fullState := by
   simp [VanillaVM.System.toZkVM, VanillaVM.System.toMultiStep,
-    MultiStep.System.toZkVM, system, segmentSystem, ISA.System.stepPlain,
+    MultiStep.System.toZkVM, system, segmentSystem, ISA.System.step,
     ISA.System.operation, isa, memFree, fullState]
 
 /-- The final assumptions, an accepted proof, and a valid plain transition

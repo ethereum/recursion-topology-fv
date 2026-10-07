@@ -1,7 +1,6 @@
 import «recursion-topology-fv».Specification.Cte
 import «recursion-topology-fv».VMs.ISA
 import «recursion-topology-fv».VMs.Memory
-import «recursion-topology-fv».VMs.Step
 
 /-!
 # Multi-layer recursion → `MultiStepVM`
@@ -137,7 +136,7 @@ def m : ℕ := sys.T / sys.Nseg
 /-! ## The zkVM -/
 
 /-- **The multi-step zkVM.** Its state is the *full-memory* VM state; its step
-is `ISA.System.stepPlain`, the operation the fixed program selects at `code[pc]`;
+is `ISA.System.step`, the operation the fixed program selects at `code[pc]`;
 its statement carries full boundary states; its verifier commits the boundaries
 and defers to the embed SNARK.
 
@@ -146,7 +145,7 @@ stands where the two-step toy has a flat merge, over the same fixed-program ISA
 step; the bus is omitted. -/
 def toZkVM : ZkVM where
   State := FullVMState sys.VC
-  step := sys.isa.stepPlain
+  step := sys.isa.step
   T := sys.T
   Stmt := FinalStmtFull sys.VC
   PrivInput := Unit
@@ -468,8 +467,8 @@ theorem committedTrace_extract (h : sys.Assumptions) :
 
 /-- A valid committed trace yields a valid full-memory trace: `trace_mem_extract`
 reconstructs full memory along the trace, and
-`ISA.System.committedOperation_stepPlain` turns each reconstructed transition
-into the VM's `stepPlain`, upgrading `CommittedTraceValid` to `TraceValid`.
+`ISA.System.committedOperation_step` shows that each reconstructed transition
+satisfies `ISA.System.step`, upgrading `CommittedTraceValid` to `TraceValid`.
 
 Paper: `prop:memory-extractability` and `rem:mem-inheritance` (ch05). -/
 theorem traceValid_full
@@ -483,7 +482,7 @@ theorem traceValid_full
   -- the invariant seed holds definitionally (committed initial = commit of full initial)
   have hseed : CommitInv (Ŝ 0) x.S0 := by rw [hstart]; exact ⟨rfl, rfl, rfl⟩
   -- Choose a `MemStep` passing both the memory checks and the program checks at
-  -- each transition; keeping the program checks is what lets us prove `stepPlain`
+  -- each transition; keeping the program checks is what lets us prove `isa.step`
   -- once memory has been reconstructed.
   have hopC : ∀ k, k < sys.T →
       sys.isa.committedOperation (Ŝ k) (Ŝ (k + 1))
@@ -510,10 +509,10 @@ theorem traceValid_full
       _ = ⟨x.ST.pc, x.ST.regs, x.ST.mem⟩ := by rw [← hpc, ← hreg, e3]
       _ = x.ST := rfl
   · -- Every reconstructed transition executes the operation selected by
-    -- `code[pc]`, so it satisfies the VM's plain step predicate.
+    -- `code[pc]`, so it satisfies the VM's step predicate.
     intro i hi
     change i < sys.T at hi
-    exact sys.isa.committedOperation_stepPlain _ _ _ _ _
+    exact sys.isa.committedOperation_step _ _ _ _ _
       (hinv i (by omega)) (hinv (i + 1) (by omega)) (hopC i hi) (hstepF i hi)
 
 /-- **CTE for the multi-step VM.** Under its collected proof-system and memory
